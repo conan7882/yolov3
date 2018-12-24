@@ -34,7 +34,7 @@
 - Go to `experiment/convert/`, run
 
   ```
-  python convert_model.py --weights_dir WEIGHTS_DIR --save_dir SAVE_DIR
+  python convert_model.py --weights_dir WEIGHTS_DIR --save_dir SAVE_DIR
   ```
  
 - `--weights_dir` is the directory to put the pre-trained `weights` file and `--save_dir` is the directory to put the converted `npy` file.
