@@ -10,22 +10,22 @@
 - The parameter format of convolutional layers with/without batch normalization(BN) saved in the `weights` file is as the following table (reference can be found [here](https://github.com/pjreddie/darknet/blob/b13f67bfdd87434e141af532cdb5dc1b8369aa3b/src/parser.c#L958)):
 
    | *No BN* | *With BN* |
-|:--|:--|
-|Conv Bias|BN beta|
-|Conv Weights|BN gamma|
-|-|BN Moving Mean|
-|-|BN Moving Variance|
-|-|Conv Weights|
+   |:--|:--|
+   |Conv Bias|BN beta|
+   |Conv Weights|BN gamma|
+   |-|BN Moving Mean|
+   |-|BN Moving Variance|
+   |-|Conv Weights|
 - The converted model is stored as dictionary in `npy` file. Each type of parameters can be access as the following table if applicable (layers are named as `conv_1`...`conv_52`, and the output layer `conv_fc` ):
 
-  | *Parameters* | *Access* |
-|:--|:--|
-|Conv Weights|weight_dict[Layer_Name][weights]|
-|Conv Bias|weight_dict[Layer_Name][weights]|
-|BN gamma|weight_dict[Layer_Name][0]|
-|BN beta|weight_dict[Layer_Name][1]|
-|BN Moving Mean|weight_dict[Layer_Name][2]|
-|BN Moving Variance|weight_dict[Layer_Name][3]|
+   | *Parameters* | *Access* |
+   |:--|:--|
+   |Conv Weights|weight_dict[Layer_Name][weights]|
+   |Conv Bias|weight_dict[Layer_Name][weights]|
+   |BN gamma|weight_dict[Layer_Name][0]|
+   |BN beta|weight_dict[Layer_Name][1]|
+   |BN Moving Mean|weight_dict[Layer_Name][2]|
+   |BN Moving Variance|weight_dict[Layer_Name][3]|
 - An example of image classification using the pre-trained model is in [`experiment/darknet`](../../experiment/darknet.py).
 
 
