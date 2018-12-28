@@ -22,10 +22,14 @@ class Image(DataFlow):
             im = load_image(file_name, read_channel=n_channel,  pf=pf_list[0])
             return im
 
+        def read_shape(file_name):
+            im = load_image(file_name, read_channel=n_channel)
+            return im.shape[0:2]
+
         super(Image, self).__init__(
-            data_name_list=[im_name],
-            data_dir=data_dir,
+            data_name_list=[im_name, im_name],
+            data_dir=[data_dir, data_dir],
             shuffle=shuffle,
             batch_dict_name=batch_dict_name,
-            load_fnc_list=[read_image],
+            load_fnc_list=[read_image, read_shape],
             ) 

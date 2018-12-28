@@ -7,6 +7,10 @@ import numpy as np
 
 
 # box [xmin, ymin, xmax, ymax]
+def xyxy2yxyx(bbox_list):
+    return np.stack([bbox_list[:, 1], bbox_list[:, 0],
+                     bbox_list[:, 3], bbox_list[:, 2]], axis=-1)
+
 def bbox_area(box):
     return (box[2] - box[0] + 1) * (box[3] - box[1] + 1)
 
@@ -54,9 +58,20 @@ def bbox_IOU(box_1, box_2, align=False):
     inter_area = bbox_intersec_area(box_1, box_2, align=align)
     return inter_area / (bbox_area(box_1) + bbox_area(box_2) - inter_area)
 
+def rescale_bbox(bbox_list, from_shape, to_shape):
+    # from_shape, to_shape [h, w]
+    # bbox_list[i] [x, y, x, y] or [cx, xy, w, h]
+    rescale_bbox = np.stack(
+        [bbox_list[:, 0] / from_shape[1] * to_shape[1],
+         bbox_list[:, 1] / from_shape[0] * to_shape[0],
+         bbox_list[:, 2] / from_shape[1] * to_shape[1],
+         bbox_list[:, 3] / from_shape[0] * to_shape[0]], axis=-1)
+    return rescale_bbox
+
 
 if __name__ == '__main__':
     b_1 = [0, 2, 1, 3]
     b_2 = [0, 2, 1, 3]
     b_2 = [i + 0.5 for i in b_2]
     print(bbox_IOU(b_1, b_2, align=True))
+

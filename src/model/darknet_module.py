@@ -69,7 +69,9 @@ def darkent53_conv(inputs, pretrained_dict=None, init_w=None, init_b=tf.zeros_in
             res_block(n_block=1, out_dim=64)
             res_block(n_block=2, out_dim=128)
             res_block(n_block=8, out_dim=256)
+            route_2 = layer_dict['cur_input']
             res_block(n_block=8, out_dim=512)
+            route_1 = layer_dict['cur_input']
             res_block(n_block=4, out_dim=1024)
 
-            return layer_dict['cur_input']
+            return layer_dict['cur_input'], route_1, route_2

@@ -8,31 +8,93 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import src.bbox.tfbboxtool as tfbboxtool
+import src.bbox.bboxtool as bboxtool
+from src.utils.visualization_utils import draw_bounding_boxes_on_image_tensors
+from src.utils.visualization_utils import visualize_boxes_and_labels_on_image_array
 
-def draw_bounding_box(im, box):
-    box = np.array(box)
-    if len(box.shape) == 1:
-        box = [box]
+def draw_bounding_box_on_image_array(im, bbox_list, class_list, score_list, category_index):
+    im = np.array(im).astype(np.uint8)
+    bbox_im = im
+    if len(class_list) > 0:
+        viz_bbox = bboxtool.xyxy2yxyx(bbox_list)
+        class_list = list(map(int, class_list))
 
+        bbox_im = visualize_boxes_and_labels_on_image_array(
+            image=im,
+            boxes=viz_bbox,
+            classes=class_list,
+            scores=score_list,
+            category_index=category_index,
+            instance_masks=None,
+            keypoints=None,
+            use_normalized_coordinates=False,
+            max_boxes_to_draw=20,
+            min_score_thresh=.1,
+            agnostic_mode=False,
+            line_thickness=4)
+    plt.figure()
+    plt.imshow(bbox_im)
+    plt.show()
+
+# def tf_draw_bounding_box(im, box, classes, scores, category_index,
+#                          max_boxes_to_draw=20, min_score_thresh=0.2):
+
+#     im = tf.cast(im, tf.uint8)
+#     box = tf.cast(box, tf.float32)
+#     classes = tf.cast(classes, tf.int32)
+
+#     # change box to [y_min, x_min, y_max, x_max]
+#     im_h = tf.cast(tf.shape(im)[1], tf.float32)
+#     im_w = tf.cast(tf.shape(im)[2], tf.float32)
+
+#     box = tf.stack([box[:, :, 1] / im_h, box[:, :, 0] / im_w, box[:, :, 3] / im_h, box[:, :, 2] / im_w], axis=1)
+#     box = tf.expand_dims(box, dim=0)
+
+#     bbox_im = draw_bounding_boxes_on_image_tensors(
+#             im,
+#             box,
+#             classes,
+#             scores,
+#             category_index,
+#             max_boxes_to_draw=max_boxes_to_draw,
+#             min_score_thresh=min_score_thresh)
+
+#     return bbox_im
+
+def draw_bounding_box(im, box, label_list=None, box_type='xyxy'):
     im = np.array(im, dtype=np.uint8)
-
     # Create figure and axes
     fig, ax = plt.subplots(1)
-
     # Display the image
     ax.imshow(im)
 
-    # Create a Rectangle patch
-    for c_box in box:
-        rect = patches.Rectangle((c_box[0], c_box[1]), c_box[2] - c_box[0], c_box[3] - c_box[1],
-                                  linewidth=1, edgecolor='r', facecolor='none')
-        # Add the patch to the Axes
-        ax.add_patch(rect)
+    if len(box) > 0:
+        box = np.array(box)
+        if len(box.shape) == 1:
+            box = [box]
+        # Create a Rectangle patch
+        for idx, c_box in enumerate(box):
+            if box_type == 'xyxy':
+                rect = patches.Rectangle(
+                    (c_box[0], c_box[1]), c_box[2] - c_box[0], c_box[3] - c_box[1],
+                    linewidth=2, edgecolor='r', facecolor='none')
+                x, y = c_box[0], c_box[1]
+            elif box_type == 'cxywh':
+                rect = patches.Rectangle(
+                    (c_box[0] - c_box[2] / 2, c_box[1]- c_box[3] / 2), c_box[2], c_box[3],
+                    linewidth=2, edgecolor='r', facecolor='none')
+                x, y = c_box[0] - c_box[2] / 2, c_box[1]- c_box[3] / 2
 
+            # Add the patch to the Axes
+            ax.add_patch(rect)
+            if label_list is not None:
+                ax.text((x)/im.shape[0], 1 - (y)/im.shape[1], s=label_list[idx],
+                        fontdict={'color': 'darkred', 'weight': 'bold'},
+                        horizontalalignment='center',verticalalignment='center',
+                        transform=ax.transAxes)
     ax.axis('off')
-
     plt.show()
-
 
 def viz_batch_im(batch_im, grid_size, save_path,
                  gap=0, gap_color=0, shuffle=False):

@@ -40,7 +40,7 @@ class DarkNet53(BaseModel):
 
     def _create_model(self, inputs):
         with tf.variable_scope('DarkNet53', reuse=tf.AUTO_REUSE):
-            conv_out = module.darkent53_conv(
+            conv_out, _, _ = module.darkent53_conv(
                 inputs, pretrained_dict=self._pretrained_dict, init_w=INIT_W,
                 bn=True, wd=0, trainable=self._trainable, is_training=self.is_training,
                 name='darkent53_conv')

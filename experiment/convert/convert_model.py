@@ -22,22 +22,37 @@ def unique_config_sections(config_path):
     """
     section_counters = defaultdict(int)
     output_stream = io.StringIO()
+    yolo_id = 0
+    # prev_dim = 3
+    # prev_dim_dict = {}
     with open(config_path) as fin:
         for line in fin:
             if line.startswith('['):
                 section = line.strip().strip('[]')
-                section_counters[section] += 1
-
-                if section == 'convolutional':
-                    n_section = 'conv'
-                elif section == 'convolutional_fc':
-                    n_section = 'conv_fc'
-                else:
+                n_section = section
+                # out_dim = prev_dim
+                if section == 'yolo':
                     n_section = section
+                    yolo_id += 1
+                elif yolo_id < 1:
+                    if section == 'convolutional':
+                        n_section = 'conv'
+                        if section_counters[n_section] == 51:
+                            yolo_id = 1
+                    elif section == 'convolutional_fc':
+                        n_section = 'conv_fc'
+                elif yolo_id > 0:
+                    if section == 'convolutional':
+                        n_section = 'conv_{}'.format(yolo_id)                    
 
-                _section = n_section + '_' + str(section_counters[section])
+                section_counters[n_section] += 1
+                if yolo_id > 1:
+                    _section = n_section + '_' + str(section_counters[n_section]-1)
+                else:
+                    _section = n_section + '_' + str(section_counters[n_section])
+                # prev_dim_dict[_section] = prev_dim
+                # prev_dim = out_dim
                 print(_section)
-                
                 line = line.replace(section, _section)
             output_stream.write(line)
     output_stream.seek(0)
@@ -126,8 +141,10 @@ def convert(weights_path, config_path, save_path):
 
     save_weight_dict = {}
     layer_dict = {}
+    dim_list = []
     layer_dict['prev_layer_channel'] = 3
     layer_dict['count'] = 0
+    # layer_id = 0
     for section in cfg_parser.sections():
         print('Parsing section {}'.format(section))
         if section.startswith('conv'):
@@ -140,34 +157,51 @@ def convert(weights_path, config_path, save_path):
                save_weight_dict[section]['bn'] = layer_dict['bn_weight_list']
             if len(layer_dict['conv_bias']) > 0:
                 save_weight_dict[section]['biases'] = layer_dict['conv_bias']
-
+        elif section.startswith('route'):
+            route_layers = list(map(int, (cfg_parser[section]['layers']).split(',')))
+            layer_dict['prev_layer_channel'] = sum([dim_list[layer_] for layer_ in route_layers])
+            # print(route_layers)
+        dim_list.append(layer_dict['prev_layer_channel'])
+        # layer_id += 1
     remaining_weights = len(weights_file.read()) / 4
     print('Load {} of {} from weights.'.format(layer_dict['count'], remaining_weights + layer_dict['count']))
     weights_file.close()
-
-    np.save(save_path, save_weight_dict)
+    # print(dim_list)
+    # np.save(save_path, save_weight_dict)
 
 def get_args():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--weights_dir', type='str', default='')
-    parser.add_argument('--save_dir', type='str', default='')
+    parser.add_argument('--weights_dir', type=str, default='')
+    parser.add_argument('--save_dir', type=str, default='')
+
+    parser.add_argument('--model', type=str, default='yolo')
     
     return parser.parse_args()
 
 
 if __name__ == '__main__':
-    # if platform.node() == 'arostitan':
-    #     weights_dir = '/home/qge2/workspace/data/pretrain/yolo/'
-    # elif platform.node() == 'aros04':
-    #     weights_dir = 'E:/Dataset/pretrained/'
-    # else:
-    #     weights_dir = '/Users/gq/workspace/Dataset/pretrained/'
-    #     save_dir = '/Users/gq/workspace/Dataset/pretrained/'
+    if platform.node() == 'arostitan':
+        weights_dir = '/home/qge2/workspace/data/pretrain/yolo/'
+    elif platform.node() == 'aros04':
+        weights_dir = 'E:/Dataset/pretrained/'
+    elif platform.node() == 'Qians-MacBook-Pro.local':
+        weights_dir = '/Users/gq/workspace/Dataset/pretrained/'
+        save_dir = '/Users/gq/workspace/Dataset/pretrained/'
+    else:
+        weights_dir = FLAGS.weights_dir
+        save_dir = FLAGS.save_dir
+
 
     FLAGS = get_args()
-    config_path = 'darknet53.cfg'
-    weights_path = os.path.join(FLAGS.weights_dir, 'darknet53_448.weights')
-    save_path = os.path.join(FLAGS.save_dir, 'darknet53_448.npy')
+    if FLAGS.model == 'darknet':
+        config_path = 'darknet53.cfg'
+        weights_path = os.path.join(weights_dir, 'darknet53_448.weights')
+        save_path = os.path.join(save_dir, 'darknet53_448.npy')
+    elif FLAGS.model == 'yolo':
+        config_path = 'yolov3.cfg'
+        weights_path = os.path.join(weights_dir, 'yolov3.weights')
+        save_path = os.path.join(save_dir, 'yolov3.npy')
     convert(weights_path, config_path, save_path)
+    # unique_config_sections(config_path)
     

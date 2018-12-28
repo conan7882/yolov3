@@ -14,6 +14,43 @@ from src.dataflow.images import Image
 from src.dataflow.voc import VOC, get_class_dict_from_xml
 
 
+def load_coco80_label_yolo():
+    label_dict = {}
+    file_path = '../data/coco.names'
+    with open(file_path, 'r') as f:
+        for idx, line in enumerate(f):
+            names = line.rstrip()
+            label_dict[idx] = names
+
+    category_index = {}
+    for class_id in label_dict:
+        category_index[class_id] = {'id': class_id, 'name': label_dict[class_id]}
+
+    return label_dict, category_index
+
+def load_imagenet1k_label_darknet():
+    """ 
+        Function to read the ImageNet label file.
+        Used for testing the pre-trained model.
+
+        dataset (str): name of data set. 'imagenet', 'cifar'
+    """
+    imagenet_label_dict = {}
+    file_path = '../data/imageNetLabel.txt'
+    with open(file_path, 'r') as f:
+        for idx, line in enumerate(f):
+            names = line.rstrip()[10:]
+            imagenet_label_dict[line.rstrip()[:9]] = names
+
+    label_dict = {}
+    file_path = '../data/imagenet.labels.list'
+    with open(file_path, 'r') as f:
+        for idx, line in enumerate(f):
+            if idx >= 1000:
+                break
+            label_dict[idx] = imagenet_label_dict[line.rstrip('\n')]
+    return label_dict
+
 def load_VOC(batch_size=1):
     if platform.node() == 'arostitan':
         raise ValueError('Data path does not setup on this platform!')
@@ -39,29 +76,6 @@ def load_VOC(batch_size=1):
 
     return train_data
 
-def load_imagenet1k_label_darknet():
-    """ 
-        Function to read the ImageNet label file.
-        Used for testing the pre-trained model.
-
-        dataset (str): name of data set. 'imagenet', 'cifar'
-    """
-    imagenet_label_dict = {}
-    file_path = '../data/imageNetLabel.txt'
-    with open(file_path, 'r') as f:
-        for idx, line in enumerate(f):
-            names = line.rstrip()[10:]
-            imagenet_label_dict[line.rstrip()[:9]] = names
-
-    label_dict = {}
-    file_path = '../data/imagenet.labels.list'
-    with open(file_path, 'r') as f:
-        for idx, line in enumerate(f):
-            if idx >= 1000:
-                break
-            label_dict[idx] = imagenet_label_dict[line.rstrip('\n')]
-    return label_dict
-
 def read_image(im_name, n_channel, data_dir='', batch_size=1, rescale=None):
     """ function for create a Dataflow for reading images from a folder
         This function returns a Dataflow object for images with file 
@@ -78,7 +92,7 @@ def read_image(im_name, n_channel, data_dir='', batch_size=1, rescale=None):
             Image (object): batch images can be access by Image.next_batch_dict()['image']
     """
 
-    def rescale_im(im, short_side=224):
+    def rescale_im(im, short_side=416):
         """ Pre-process for images 
             images are rescaled so that the shorter side = 224
         """
@@ -96,8 +110,9 @@ def read_image(im_name, n_channel, data_dir='', batch_size=1, rescale=None):
         return im
 
     def normalize_im(im):
-        if rescale is not None:
-            im = rescale_im(im, short_side=rescale)
+        im = skimage.transform.resize(
+            im, rescale, preserve_range=True)
+        #     im = rescale_im(im, short_side=rescale)
         im = np.array(im)
         if np.amax(im) > 1:
             im = im / 255.
@@ -108,12 +123,17 @@ def read_image(im_name, n_channel, data_dir='', batch_size=1, rescale=None):
     # else:
     #     pf_fnc = normalize_im
 
+    if not isinstance(rescale, list):
+        rescale = [rescale, rescale]
+    else:
+        assert len(rescale) == 2
+
     image_data = Image(
         im_name=im_name,
         data_dir=data_dir,
         n_channel=n_channel,
         shuffle=False,
-        batch_dict_name=['image'],
+        batch_dict_name=['image', 'shape'],
         pf_list=normalize_im)
     image_data.setup(epoch_val=0, batch_size=batch_size)
 
