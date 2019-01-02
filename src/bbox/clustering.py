@@ -7,48 +7,6 @@ import numpy as np
 import src.bbox.bboxtool as bboxtool
 
 
-def bbox_list_IOU(bbox_list_1, bbox_list_2, align=True):
-    bbox_list_1 = np.array(bbox_list_1)
-    bbox_list_2 = np.array(bbox_list_2)
-    if len(bbox_list_1.shape) == 1:
-        bbox_list_1 = [bbox_list_1]
-    elif len(bbox_list_1.shape) > 2:
-        raise ValueError('Incorrect shape of bbox_list_1')
-
-    if len(bbox_list_2.shape) == 1:
-        bbox_list_2 = [bbox_list_2]
-    elif len(bbox_list_2.shape) > 2:
-        raise ValueError('Incorrect shape of bbox_list_2')
-
-    if align:
-        transpose_sign = False
-        if len(bbox_list_2) < len(bbox_list_1):
-            bbox_list_1, bbox_list_2 = bbox_list_2, bbox_list_1
-            transpose_sign = True
-
-        h_list = bbox_list_2[:, 3] - bbox_list_2[:, 1]
-        w_list = bbox_list_2[:, 2] - bbox_list_2[:, 0]
-        area_list = np.multiply(h_list, w_list)
-
-        iou_list = []
-        for bbox in bbox_list_1:
-            h = bbox[3] - bbox[1]
-            w = bbox[2] - bbox[0]
-            area = h * w
-
-            inter_h = np.minimum(h, h_list)
-            inter_w = np.minimum(w, w_list)
-            inter_area = np.multiply(inter_h, inter_w)
-            iou = inter_area / (area_list + area - inter_area)
-            iou_list.append(iou)
-
-        iou_list = np.array(iou_list)
-        if transpose_sign:
-            return iou_list.transpose()
-        else:
-            return iou_list
-
-
 # box [xmin, ymin, xmax, ymax]
 class BboxClustering(object):
     def __init__(self, bbox_list):
@@ -64,7 +22,7 @@ class BboxClustering(object):
         cnt = 0
         while True:
             cnt += 1
-            iou = bbox_list_IOU(self._bbox_list, centroid, align=True)
+            iou = bboxtool.bbox_list_IOU(self._bbox_list, centroid, align=True)
             dist = 1 - iou
             label = np.argmin(dist, axis=-1)
             for k in range(num_cluster):
@@ -89,7 +47,7 @@ class BboxClustering(object):
         except AttributeError:
             self.clustering(num_cluster=5, max_iter=100)
 
-        iou = bbox_list_IOU(self._bbox_list, self._centroid, align=True)
+        iou = bboxtool.bbox_list_IOU(self._bbox_list, self._centroid, align=True)
         max_iou = np.amax(iou, axis=-1)
         return np.mean(max_iou)
 

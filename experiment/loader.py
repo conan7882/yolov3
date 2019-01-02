@@ -12,6 +12,7 @@ import sys
 sys.path.append('../')
 from src.dataflow.images import Image
 from src.dataflow.voc import VOC, get_class_dict_from_xml
+import src.utils.image as imagetool
 
 
 def load_coco80_label_yolo():
@@ -51,7 +52,7 @@ def load_imagenet1k_label_darknet():
             label_dict[idx] = imagenet_label_dict[line.rstrip('\n')]
     return label_dict
 
-def load_VOC(batch_size=1):
+def load_VOC(batch_size=1, rescale=416):
     if platform.node() == 'arostitan':
         raise ValueError('Data path does not setup on this platform!')
         # data_path = '/home/qge2/workspace/data/foram/CNN_sythetic/edge_set/'
@@ -64,17 +65,24 @@ def load_VOC(batch_size=1):
 
     class_dict, reverse_class_dict = get_class_dict_from_xml(xml_dir)
 
+    def normalize_im(im, *args):
+        im = imagetool.rescale_image(im, args[0])
+        im = np.array(im)
+        if np.amax(im) > 1:
+            im = im / 255.
+        return np.clip(im, 0., 1.)
+
     train_data = VOC(
         class_dict=class_dict,
         image_dir=im_dir,
         xml_dir=xml_dir,
         n_channel=3,
         shuffle=True,
-        batch_dict_name=['image', 'label'],
-        pf_list=None)
+        batch_dict_name=['image', 'label', 'shape'],
+        pf_list=(normalize_im, rescale))
     train_data.setup(epoch_val=0, batch_size=batch_size)
 
-    return train_data
+    return train_data, class_dict
 
 def read_image(im_name, n_channel, data_dir='', batch_size=1, rescale=None):
     """ function for create a Dataflow for reading images from a folder
@@ -100,18 +108,21 @@ def read_image(im_name, n_channel, data_dir='', batch_size=1, rescale=None):
         h, w = im.shape[0], im.shape[1]
         if h >= w:
             new_w = short_side
-            im = skimage.transform.resize(
-                im, (int(h * new_w / w), short_side), preserve_range=True)
+            im = imagetool.rescale_image(im, (int(h * new_w / w), short_side))
+            # im = skimage.transform.resize(
+            #     im, (int(h * new_w / w), short_side), preserve_range=True)
         else:
             new_h = short_side
-            im = skimage.transform.resize(
-                im, (short_side, int(w * new_h / h)), preserve_range=True)
+            im = imagetool.rescale_image(im, (short_side, int(w * new_h / h)))
+            # im = skimage.transform.resize(
+            #     im, (short_side, int(w * new_h / h)), preserve_range=True)
         # return im.astype('uint8')
         return im
 
     def normalize_im(im):
-        im = skimage.transform.resize(
-            im, rescale, preserve_range=True)
+        im = imagetool.rescale_image(im, rescale)
+        # im = skimage.transform.resize(
+        #     im, rescale, preserve_range=True)
         #     im = rescale_im(im, short_side=rescale)
         im = np.array(im)
         if np.amax(im) > 1:
@@ -123,7 +134,7 @@ def read_image(im_name, n_channel, data_dir='', batch_size=1, rescale=None):
     # else:
     #     pf_fnc = normalize_im
 
-    if not isinstance(rescale, list):
+    if isinstance(rescale, int):
         rescale = [rescale, rescale]
     else:
         assert len(rescale) == 2
@@ -146,18 +157,24 @@ if __name__ == '__main__':
     xml_dir = '/Users/gq/workspace/Dataset/VOCdevkit/VOC2007/Annotations/'
     # 
     # print(class_dict, reverse_class_dict)
-    dataflow = load_VOC(batch_size=2)
+    dataflow, class_dict = load_VOC(batch_size=2)
     # print(dataflow._file_name_list)
 
     batch_date = dataflow.next_batch_dict()
+    # print(batch_date['label'])
+    print(batch_date['image'][0].shape)
 
-    print(batch_date['label'])
-    print([[bbox[0] for bbox in bbox_list] for bbox_list in batch_date['label']])
-    box_list = [[bbox[1] for bbox in bbox_list] for bbox_list in batch_date['label']]
-    print(box_list)
+    dataflow.reset_image_rescale(rescale=320)
+    batch_date = dataflow.next_batch_dict()
+    # print(batch_date['label'])
+    print(batch_date['image'][0].shape)
 
-    viz.draw_bounding_box(batch_date['image'][0], box_list[0])
-    # plt.figure()
-    # plt.imshow(batch_date['image'][0])
-    # plt.show()
+    # print([[bbox[0] for bbox in bbox_list] for bbox_list in batch_date['label']])
+    # box_list = ([[(bbox[1]) for bbox in bbox_list] for bbox_list in batch_date['label']])
+    # print(box_list)
+    # im = imagetool.rescale_image(batch_date['image'][0]*255, batch_date['shape'][0])
+    # viz.draw_bounding_box(im, box_list[0])
+    plt.figure()
+    plt.imshow(batch_date['image'][0])
+    plt.show()
 

@@ -3,6 +3,7 @@
 # File: utils.py
 # Author: Qian Ge <geqian1001@gmail.com>
 
+
 def make_list(inputs):
     if not isinstance(inputs, list):
         return [inputs]

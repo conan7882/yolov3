@@ -53,9 +53,22 @@ def yolo_layer(input_feat, n_filter, out_dim, up_sample=False, darknet_feat=None
 
         return layer_dict['cur_input'], layer_dict['conv_{}_5'.format(scale_id)]
 
+def feat_upsampling_nearest_neighbor(input_feat, up_shape, name='feat_upsampling'):
+    with tf.name_scope(name):
+        up_feat = tf.image.resize_nearest_neighbor(
+            input_feat, (up_shape[0], up_shape[1]))
+        return up_feat
+
 def yolo_prediction(inputs, anchors, n_class, scale, scale_id=1, name='yolo_prediction'):
     # reference:
     # https://github.com/pjreddie/darknet/blob/master/src/yolo_layer.c#L316
+
+    def transpose_tensor_to_batch_first(in_tensor, last_dim):
+        in_tensor = tf.stack(in_tensor, axis=0)
+        in_tensor = tf.transpose(in_tensor, (1, 0, 2, 3, 4))
+        in_tensor = tf.reshape(in_tensor, (bsize, -1, last_dim))
+        return in_tensor
+
     with tf.name_scope('{}_{}'.format(name, scale_id)):
         shape = tf.shape(inputs)
         y_grid, x_grid = tf.meshgrid(tf.range(shape[1]), tf.range(shape[2]), indexing='ij')
@@ -67,27 +80,42 @@ def yolo_prediction(inputs, anchors, n_class, scale, scale_id=1, name='yolo_pred
         detection_list = tf.split(inputs, n_anchors, axis=-1, name='split_anchor')
         bbox_score = []
         bbox_list = []
+        bbox_t_coord_list = []
+        objectness_list = []
+        classes_list = []
         for anchor_id in range(n_anchors):
             cur_bbox = detection_list[anchor_id]
-            bbox, objectness, classes = tf.split(
+            bbox_t_coord, objectness_logits, classes_logits = tf.split(
                 cur_bbox, [4, 1, n_class], axis=-1, name='split_detection')
-            bbox = correct_yolo_boxes(xy_grid_flatten, bbox, anchors[anchor_id], scale)
-            objectness = tf.nn.sigmoid(objectness)
-            classes =  tf.nn.sigmoid(classes)
+            bbox = correct_yolo_boxes(xy_grid_flatten, bbox_t_coord, anchors[anchor_id], scale)
+            objectness = tf.nn.sigmoid(objectness_logits)
+            classes =  tf.nn.sigmoid(classes_logits)
 
             bbox_score.append(tf.multiply(objectness, classes))
             bbox_list.append(bbox)
+            bbox_t_coord_list.append(bbox_t_coord)
+            objectness_list.append(objectness_logits)
+            classes_list.append(classes_logits)
 
         bsize = tf.shape(inputs)[0]
-        
-        bbox_score = tf.stack(bbox_score, axis=0)
-        bbox_score = tf.transpose(bbox_score, (1, 0, 2, 3, 4))
-        bbox_score = tf.reshape(bbox_score, (bsize, -1, n_class))
+        bbox_score = transpose_tensor_to_batch_first(bbox_score, n_class)
+        bbox_list = transpose_tensor_to_batch_first(bbox_list, 4)
+        bbox_t_coord_list = transpose_tensor_to_batch_first(bbox_t_coord_list, 4)
+        objectness_list = transpose_tensor_to_batch_first(objectness_list, 1)
+        classes_list = transpose_tensor_to_batch_first(classes_list, n_class)
 
-        bbox_list = tf.stack(bbox_list, axis=0)
-        bbox_list = tf.transpose(bbox_list, (1, 0, 2, 3, 4))
-        bbox_list = tf.reshape(bbox_list, (bsize, -1, 4))
-        return bbox_score, bbox_list
+        # bbox_score = tf.stack(bbox_score, axis=0)
+        # bbox_score = tf.transpose(bbox_score, (1, 0, 2, 3, 4))
+        # bbox_score = tf.reshape(bbox_score, (bsize, -1, n_class))
+
+        # objectness_list = tf.stack(objectness_list, axis=0)
+        # bbox_score = tf.transpose(bbox_score, (1, 0, 2, 3, 4))
+        # bbox_score = tf.reshape(bbox_score, (bsize, -1, n_class))
+
+        # bbox_list = tf.stack(bbox_list, axis=0)
+        # bbox_list = tf.transpose(bbox_list, (1, 0, 2, 3, 4))
+        # bbox_list = tf.reshape(bbox_list, (bsize, -1, 4))
+        return bbox_score, bbox_list, bbox_t_coord_list, objectness_list, classes_list
 
 def correct_yolo_boxes(xy_grid_flatten, bbox, anchor, scale):
     # [bsize, h, w, 4]
@@ -140,9 +168,3 @@ def get_detection(bbox_score, bbox_list, n_class, score_thr, iou_thr,
     det_class = tf.concat(det_class, axis=0)
 
     return det_score, det_bbox, det_class
-
-def feat_upsampling_nearest_neighbor(input_feat, up_shape, name='feat_upsampling'):
-    with tf.name_scope(name):
-        up_feat = tf.image.resize_nearest_neighbor(
-            input_feat, (up_shape[0], up_shape[1]))
-        return up_feat

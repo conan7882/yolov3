@@ -22,9 +22,18 @@ class Image(DataFlow):
             im = load_image(file_name, read_channel=n_channel,  pf=pf_list[0])
             return im
 
+        # def read_shape(file_name):
+        #     im = load_image(file_name, read_channel=n_channel)
+        #     return im.shape[0:2]
+        self.image_shape_dict = {}
         def read_shape(file_name):
-            im = load_image(file_name, read_channel=n_channel)
-            return im.shape[0:2]
+            # be careful when the training set is too large
+            try:
+                return self.image_shape_dict[file_name]
+            except KeyError:
+                im = load_image(file_name, read_channel=n_channel)
+                self.image_shape_dict[file_name] = im.shape[0:2]
+                return self.image_shape_dict[file_name]
 
         super(Image, self).__init__(
             data_name_list=[im_name, im_name],

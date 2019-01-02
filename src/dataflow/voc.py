@@ -11,10 +11,11 @@ import xml.etree.ElementTree as ET
 
 from src.dataflow.base import DataFlow
 import src.utils.utils as utils
+# import src.bbox.bboxgt as bboxgt
 from src.utils.dataflow import load_image, identity, fill_pf_list, get_file_list
 
 
-def parse_bbox_xml(xml_path, class_dict=None, pf=identity):
+def parse_bbox_xml(xml_path, class_dict=None, pf=(identity,())):
     """
         Returns:
             [class_name, [xmin, ymin, xmax, ymax]]
@@ -39,13 +40,14 @@ def parse_bbox_xml(xml_path, class_dict=None, pf=identity):
         xmax = float(box.find('xmax').text)
         ymax = float(box.find('ymax').text)
         box = [xmin, ymin, xmax, ymax]
-        box = pf(box)
+        box = pf[0](box, pf[1])
         # box_list.append(box)
         try:
-            box_list.append((class_dict[name], box))
+            # box_list.append((class_dict[name], box))
+            box_list.append(np.array([class_dict[name],] + box))
         except TypeError:
-            box_list.append((name, box))
-
+            # box_list.append((name, box))
+            box_list.append([name,] + box)
     return box_list
 
 def get_class_dict_from_xml(xml_path):
@@ -72,10 +74,11 @@ def get_voc_bbox(xml_path):
     nclass = 0
     for xml_file in file_list:
         bbox_list = parse_bbox_xml(xml_file)
-        bbox_list = [bbox[1] for bbox in bbox_list]
+        bbox_list = [bbox[1:] for bbox in bbox_list]
         bboxs.extend(bbox_list)
 
     return bboxs
+
 
 class VOC(DataFlow):
     """ dataflow for CelebA dataset """
@@ -100,6 +103,8 @@ class VOC(DataFlow):
 
         self._class_dict = class_dict
         self._nclass = len(class_dict)
+        self._n_channel = n_channel
+        self._pf_list = pf_list
 
         def read_image(file_name):
             """ read color face image with pre-process function """
@@ -115,12 +120,22 @@ class VOC(DataFlow):
             re = parse_bbox_xml(xml_path, self._class_dict)
             return re
 
+        self.image_shape_dict = {}
+        def read_shape(file_name):
+            # be careful when the training set is too large
+            try:
+                return self.image_shape_dict[file_name]
+            except KeyError:
+                im = load_image(file_name, read_channel=n_channel)
+                self.image_shape_dict[file_name] = im.shape[0:2]
+                return self.image_shape_dict[file_name]
+
         super(VOC, self).__init__(
-            data_name_list=['.jpg', '.xml'],
-            data_dir=[image_dir, xml_dir],
+            data_name_list=['.jpg', '.xml', '.jpg'],
+            data_dir=[image_dir, xml_dir, image_dir],
             shuffle=shuffle,
             batch_dict_name=batch_dict_name,
-            load_fnc_list=[read_image, read_xml],
+            load_fnc_list=[read_image, read_xml, read_shape],
             ) 
 
     def _load_file_list(self, data_name_list, data_dir_list):
@@ -140,3 +155,12 @@ class VOC(DataFlow):
 
         if self._shuffle:
             self._suffle_file_list()
+
+    def reset_image_rescale(self, rescale):
+
+        def read_image(file_name):
+            """ read color face image with pre-process function """
+            image = load_image(file_name, read_channel=self._n_channel,  pf=(self._pf_list[0][0], rescale))
+            return image
+
+        self._load_fnc_list[0] = read_image

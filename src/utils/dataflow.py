@@ -20,10 +20,10 @@ def vec2onehot(vec, n_class):
     # b = np.zeros((3, 4))
     # b[np.arange(3), a] = 1
 
-def identity(inputs):
+def identity(inputs, *args):
     return inputs
 
-def fill_pf_list(pf_list, n_pf, fill_with_fnc=identity):
+def fill_pf_list(pf_list, n_pf, fill_with_fnc=(identity,())):
     """ Fill the pre-process function list.
 
     Args:
@@ -35,13 +35,13 @@ def fill_pf_list(pf_list, n_pf, fill_with_fnc=identity):
         list of pre-process function
     """
     if pf_list == None:
-        return [identity for i in range(n_pf)]
+        return [fill_with_fnc for i in range(n_pf)]
 
     new_list = []
     pf_list = utils.make_list(pf_list)
     for pf in pf_list:
         if not pf:
-            pf = identity
+            pf = fill_with_fnc
         new_list.append(pf)
     pf_list = new_list
 
@@ -50,7 +50,7 @@ def fill_pf_list(pf_list, n_pf, fill_with_fnc=identity):
     pf_list = pf_list + [fill_with_fnc for i in range(n_pf - len(pf_list))]
     return pf_list
 
-def load_image(im_path, read_channel=None, pf=identity):
+def load_image(im_path, read_channel=None, pf=(identity, ())):
     """ Load one image from file and apply pre-process function.
 
     Args:
@@ -72,10 +72,10 @@ def load_image(im_path, read_channel=None, pf=identity):
         im = imageio.imread(im_path, as_gray=True)
 
     if len(im.shape) < 3:
-        im = pf(im)
+        im = pf[0](im, pf[1])
         im = np.reshape(im, [im.shape[0], im.shape[1], 1])
     else:
-        im = pf(im)
+        im = pf[0](im, pf[1])
 
     return im
 
