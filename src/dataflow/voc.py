@@ -5,79 +5,12 @@
 
 import os
 import re
-import scipy.misc
 import numpy as np
-import xml.etree.ElementTree as ET
 
 from src.dataflow.base import DataFlow
 import src.utils.utils as utils
-# import src.bbox.bboxgt as bboxgt
-from src.utils.dataflow import load_image, identity, fill_pf_list, get_file_list
-
-
-def parse_bbox_xml(xml_path, class_dict=None, pf=(identity,())):
-    """
-        Returns:
-            [class_name, [xmin, ymin, xmax, ymax]]
-    """
-    tree = ET.parse(xml_path)
-    root = tree.getroot()
-
-    box_list = []
-    for obj in root.findall('object'):
-        name = obj.find('name').text
-        # try:
-        #     self._class_dict[name]
-        #     cur_class = self._class_dict[name]
-        # except KeyError:
-        #     self._class_dict[name] = self._nclass
-        #     cur_class = self._class_dict[name]
-        #     self._nclass += 1
-
-        box = obj.find('bndbox')
-        xmin = float(box.find('xmin').text)
-        ymin = float(box.find('ymin').text)
-        xmax = float(box.find('xmax').text)
-        ymax = float(box.find('ymax').text)
-        box = [xmin, ymin, xmax, ymax]
-        box = pf[0](box, pf[1])
-        # box_list.append(box)
-        try:
-            # box_list.append((class_dict[name], box))
-            box_list.append(np.array([class_dict[name],] + box))
-        except TypeError:
-            # box_list.append((name, box))
-            box_list.append([name,] + box)
-    return box_list
-
-def get_class_dict_from_xml(xml_path):
-    file_list = get_file_list(xml_path, 'xml')
-    class_dict = {}
-    reverse_class_dict = {}
-    nclass = 0
-    for xml_file in file_list:
-        bbox_list = parse_bbox_xml(xml_file)
-        for bbox in bbox_list:
-            cur_name = bbox[0]
-            if cur_name not in class_dict:
-                class_dict[cur_name] = nclass
-                reverse_class_dict[nclass] = cur_name
-                nclass += 1
-
-    return class_dict, reverse_class_dict
-
-def get_voc_bbox(xml_path):
-    bboxs = []
-    file_list = get_file_list(xml_path, 'xml')
-    class_dict = {}
-    reverse_class_dict = {}
-    nclass = 0
-    for xml_file in file_list:
-        bbox_list = parse_bbox_xml(xml_file)
-        bbox_list = [bbox[1:] for bbox in bbox_list]
-        bboxs.extend(bbox_list)
-
-    return bboxs
+from src.utils.dataflow import identity, fill_pf_list, get_file_list
+from src.utils.dataflow import load_image, get_voc_bbox, parse_bbox_xml
 
 
 class VOC(DataFlow):
@@ -98,8 +31,7 @@ class VOC(DataFlow):
             pf_list: pre-process functions for face image
         """
 
-        pf_list = fill_pf_list(
-            pf_list, n_pf=2, fill_with_fnc=identity)
+        pf_list = fill_pf_list(pf_list, n_pf=2)
 
         self._class_dict = class_dict
         self._nclass = len(class_dict)

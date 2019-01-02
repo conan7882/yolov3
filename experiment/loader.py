@@ -11,7 +11,8 @@ import skimage.transform
 import sys
 sys.path.append('../')
 from src.dataflow.images import Image
-from src.dataflow.voc import VOC, get_class_dict_from_xml
+from src.dataflow.voc import VOC
+from src.utils.dataflow import get_class_dict_from_xml
 import src.utils.image as imagetool
 
 
@@ -119,7 +120,7 @@ def read_image(im_name, n_channel, data_dir='', batch_size=1, rescale=None):
         # return im.astype('uint8')
         return im
 
-    def normalize_im(im):
+    def normalize_im(im, *args):
         im = imagetool.rescale_image(im, rescale)
         # im = skimage.transform.resize(
         #     im, rescale, preserve_range=True)
@@ -145,7 +146,7 @@ def read_image(im_name, n_channel, data_dir='', batch_size=1, rescale=None):
         n_channel=n_channel,
         shuffle=False,
         batch_dict_name=['image', 'shape'],
-        pf_list=normalize_im)
+        pf_list=(normalize_im,()))
     image_data.setup(epoch_val=0, batch_size=batch_size)
 
     return image_data

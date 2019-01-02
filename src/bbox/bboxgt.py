@@ -77,7 +77,7 @@ class TargetAnchor(object):
         # b_id = -1
         batch_gt_mask = []
         for gt_bbox, im_shape in zip(gt_bbox_batch, im_shape_batch):
-            print(len(gt_bbox))
+            # print(len(gt_bbox))
             # b_id += 1
             gt_mask = copy.deepcopy(self.init_gt_mask_dict[rescale_shape[0]])
             gt_bbox_para, gt_bbox_label = self._convert_gt(gt_bbox, im_shape, rescale_shape)
@@ -119,7 +119,7 @@ class TargetAnchor(object):
         if is_flatten:
             batch_gt_mask = self._flatten_gt_mask(batch_gt_mask)
 
-        return np.array(batch_gt_mask) #, target_anchor_batch
+        return np.array(batch_gt_mask)#, target_anchor_batch
 
     def _flatten_gt_mask(self, gt_mask_batch):
         flatten_gt_mask_batch = []

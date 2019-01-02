@@ -4,51 +4,15 @@
 # Author: Qian Ge <geqian1001@gmail.com>
 
 import os
-from datetime import datetime
-import numpy as np
 import imageio
-# import scipy.misc
-
+import numpy as np
+from datetime import datetime
+import xml.etree.ElementTree as ET
 import src.utils.utils as utils
 
-def vec2onehot(vec, n_class):
-    vec = np.array(vec)
-    one_hot = np.zeros((len(vec), n_class))
-    one_hot[np.arange(len(vec)), vec] = 1
-    return one_hot
-    # a = np.array([1, 0, 3])
-    # b = np.zeros((3, 4))
-    # b[np.arange(3), a] = 1
 
 def identity(inputs, *args):
     return inputs
-
-def fill_pf_list(pf_list, n_pf, fill_with_fnc=(identity,())):
-    """ Fill the pre-process function list.
-
-    Args:
-        pf_list (list): input list of pre-process functions
-        n_pf (int): required number of pre-process functions 
-        fill_with_fnc: function used to fill the list
-
-    Returns:
-        list of pre-process function
-    """
-    if pf_list == None:
-        return [fill_with_fnc for i in range(n_pf)]
-
-    new_list = []
-    pf_list = utils.make_list(pf_list)
-    for pf in pf_list:
-        if not pf:
-            pf = fill_with_fnc
-        new_list.append(pf)
-    pf_list = new_list
-
-    if len(pf_list) > n_pf:
-        raise ValueError('Invalid number of preprocessing functions')
-    pf_list = pf_list + [fill_with_fnc for i in range(n_pf - len(pf_list))]
-    return pf_list
 
 def load_image(im_path, read_channel=None, pf=(identity, ())):
     """ Load one image from file and apply pre-process function.
@@ -78,6 +42,96 @@ def load_image(im_path, read_channel=None, pf=(identity, ())):
         im = pf[0](im, pf[1])
 
     return im
+
+def parse_bbox_xml(xml_path, class_dict=None, pf=(identity,())):
+    """
+        Returns:
+            [class_name, [xmin, ymin, xmax, ymax]]
+    """
+    tree = ET.parse(xml_path)
+    root = tree.getroot()
+
+    box_list = []
+    for obj in root.findall('object'):
+        name = obj.find('name').text
+
+        box = obj.find('bndbox')
+        xmin = float(box.find('xmin').text)
+        ymin = float(box.find('ymin').text)
+        xmax = float(box.find('xmax').text)
+        ymax = float(box.find('ymax').text)
+        box = [xmin, ymin, xmax, ymax]
+        box = pf[0](box, pf[1])
+        # box_list.append(box)
+        try:
+            # box_list.append((class_dict[name], box))
+            box_list.append(np.array([class_dict[name],] + box))
+        except TypeError:
+            # box_list.append((name, box))
+            box_list.append([name,] + box)
+    return box_list
+
+def get_class_dict_from_xml(xml_path):
+    file_list = get_file_list(xml_path, 'xml')
+    class_dict = {}
+    reverse_class_dict = {}
+    nclass = 0
+    for xml_file in file_list:
+        bbox_list = parse_bbox_xml(xml_file)
+        for bbox in bbox_list:
+            cur_name = bbox[0]
+            if cur_name not in class_dict:
+                class_dict[cur_name] = nclass
+                reverse_class_dict[nclass] = cur_name
+                nclass += 1
+
+    return class_dict, reverse_class_dict
+
+def get_voc_bbox(xml_path):
+    bboxs = []
+    file_list = get_file_list(xml_path, 'xml')
+    class_dict = {}
+    reverse_class_dict = {}
+    nclass = 0
+    for xml_file in file_list:
+        bbox_list = parse_bbox_xml(xml_file)
+        bbox_list = [bbox[1:] for bbox in bbox_list]
+        bboxs.extend(bbox_list)
+
+    return bboxs
+
+def vec2onehot(vec, n_class):
+    vec = np.array(vec)
+    one_hot = np.zeros((len(vec), n_class))
+    one_hot[np.arange(len(vec)), vec] = 1
+    return one_hot
+
+def fill_pf_list(pf_list, n_pf, fill_with_fnc=(identity,())):
+    """ Fill the pre-process function list.
+
+    Args:
+        pf_list (list): input list of pre-process functions
+        n_pf (int): required number of pre-process functions 
+        fill_with_fnc: function used to fill the list
+
+    Returns:
+        list of pre-process function
+    """
+    if pf_list == None:
+        return [fill_with_fnc for i in range(n_pf)]
+
+    new_list = []
+    pf_list = utils.make_list(pf_list)
+    for pf in pf_list:
+        if not pf:
+            pf = fill_with_fnc
+        new_list.append(pf)
+    pf_list = new_list
+
+    if len(pf_list) > n_pf:
+        raise ValueError('Invalid number of preprocessing functions')
+    pf_list = pf_list + [fill_with_fnc for i in range(n_pf - len(pf_list))]
+    return pf_list
 
 def get_file_list(file_dir, file_ext, sub_name=None):
     """ Get file list in a directory with sepcific filename and extension
