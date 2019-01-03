@@ -6,6 +6,10 @@
 import imageio
 import numpy as np
 import tensorflow as tf
+import matplotlib
+import platform
+if platform.node() == 'arostitan':
+    matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import src.bbox.tfbboxtool as tfbboxtool
@@ -13,7 +17,8 @@ import src.bbox.bboxtool as bboxtool
 from src.utils.visualization_utils import draw_bounding_boxes_on_image_tensors
 from src.utils.visualization_utils import visualize_boxes_and_labels_on_image_array
 
-def draw_bounding_box_on_image_array(im, bbox_list, class_list, score_list, category_index):
+def draw_bounding_box_on_image_array(im, bbox_list, class_list, score_list,
+                                     category_index, save_name=None, save_fig=False):
     im = np.array(im).astype(np.uint8)
     bbox_im = im
     if len(class_list) > 0:
@@ -35,7 +40,12 @@ def draw_bounding_box_on_image_array(im, bbox_list, class_list, score_list, cate
             line_thickness=4)
     plt.figure()
     plt.imshow(bbox_im)
-    plt.show()
+    plt.axis('off')
+
+    if save_fig and save_name is not None:
+        plt.savefig(save_name, bbox_inches='tight', pad_inches=0)
+    else:
+        plt.show()
 
 # def tf_draw_bounding_box(im, box, classes, scores, category_index,
 #                          max_boxes_to_draw=20, min_score_thresh=0.2):

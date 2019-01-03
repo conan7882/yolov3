@@ -55,8 +55,8 @@ def load_imagenet1k_label_darknet():
 
 def load_VOC(batch_size=1, rescale=416):
     if platform.node() == 'arostitan':
-        raise ValueError('Data path does not setup on this platform!')
-        # data_path = '/home/qge2/workspace/data/foram/CNN_sythetic/edge_set/'
+        im_dir = '/home/qge2/workspace/data/dataset/VOCdevkit/VOC2007/JPEGImages/'
+        xml_dir = '/home/qge2/workspace/data/dataset/VOCdevkit/VOC2007/Annotations/'
     elif platform.node() == 'aros04':
         im_dir = 'E:/Dataset/VOCdevkit/VOC2007/JPEGImages/'
         xml_dir = 'E:/Dataset/VOCdevkit/VOC2007/Annotations/'
@@ -64,7 +64,11 @@ def load_VOC(batch_size=1, rescale=416):
         im_dir = '/Users/gq/workspace/Dataset/VOCdevkit/VOC2007/JPEGImages/'
         xml_dir = '/Users/gq/workspace/Dataset/VOCdevkit/VOC2007/Annotations/'
 
-    class_dict, reverse_class_dict = get_class_dict_from_xml(xml_dir)
+    class_name_dict, class_id_dict = get_class_dict_from_xml(xml_dir)
+
+    category_index = {}
+    for class_id in class_id_dict:
+        category_index[class_id] = {'id': class_id, 'name': class_id_dict[class_id]}
 
     def normalize_im(im, *args):
         im = imagetool.rescale_image(im, args[0])
@@ -74,7 +78,7 @@ def load_VOC(batch_size=1, rescale=416):
         return np.clip(im, 0., 1.)
 
     train_data = VOC(
-        class_dict=class_dict,
+        class_dict=class_name_dict,
         image_dir=im_dir,
         xml_dir=xml_dir,
         n_channel=3,
@@ -83,7 +87,7 @@ def load_VOC(batch_size=1, rescale=416):
         pf_list=(normalize_im, rescale))
     train_data.setup(epoch_val=0, batch_size=batch_size)
 
-    return train_data, class_dict
+    return train_data, class_id_dict, category_index
 
 def read_image(im_name, n_channel, data_dir='', batch_size=1, rescale=None):
     """ function for create a Dataflow for reading images from a folder

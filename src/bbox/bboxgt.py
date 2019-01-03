@@ -113,7 +113,10 @@ class TargetAnchor(object):
                     bboxtool.xyxy2yolotcoord([gt_bbox], anchor_xyxy, anchor_stride, [col_id, row_id])
                 gt_mask[scale_id][prior_id][row_id, col_id, 4] = 1
                 gt_mask[scale_id][prior_id][row_id, col_id, 5] = 0
+                # TODO
+                # multi-class
                 gt_mask[scale_id][prior_id][row_id, col_id, 6:] = one_hot_label[gt_id]
+                # print(one_hot_label[gt_id])
             batch_gt_mask.append(gt_mask)
 
         if is_flatten:

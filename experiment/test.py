@@ -17,7 +17,7 @@ import src.utils.viz as viz
 import src.utils.image as image
 
 if __name__ == "__main__":
-    pathconfig = parscfg.parse_cfg('configs/path.cfg')
+    pathconfig = parscfg.parse_cfg('configs/{}_path.cfg'.format(platform.node()))
     pretrained_path = pathconfig['coco_pretrained_npy_path']
     data_dir = pathconfig['test_image_path']
     im_name = pathconfig['test_image_name']
@@ -25,13 +25,14 @@ if __name__ == "__main__":
     netconfig = parscfg.parse_cfg('configs/coco80.cfg')
     im_rescale = netconfig['rescale']
     n_channel = netconfig['n_channel']
-    bsize = netconfig['bsize']
+    bsize = netconfig['test_bsize']
     obj_score_thr = netconfig['obj_score_thr']
     nms_iou_thr = netconfig['nms_iou_thr']
     n_class = netconfig['n_class']
     anchors = netconfig['anchors']
 
-    image_data, _ = loader.load_VOC(batch_size=bsize)
+    image_data, label_dict, _ = loader.load_VOC(batch_size=bsize)
+    print(label_dict)
 
     batch_data = image_data.next_batch_dict()
 

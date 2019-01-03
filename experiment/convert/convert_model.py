@@ -167,7 +167,7 @@ def convert(weights_path, config_path, save_path):
     print('Load {} of {} from weights.'.format(layer_dict['count'], remaining_weights + layer_dict['count']))
     weights_file.close()
     # print(dim_list)
-    # np.save(save_path, save_weight_dict)
+    np.save(save_path, save_weight_dict)
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -198,6 +198,10 @@ if __name__ == '__main__':
         config_path = 'darknet53.cfg'
         weights_path = os.path.join(weights_dir, 'darknet53_448.weights')
         save_path = os.path.join(save_dir, 'darknet53_448.npy')
+    elif FLAGS.model == 'yolov3_feat':
+        config_path = 'yolov3_feat.cfg'
+        weights_path = os.path.join(weights_dir, 'yolov3.weights')
+        save_path = os.path.join(save_dir, 'yolov3_feat.npy')
     elif FLAGS.model == 'yolo':
         config_path = 'yolov3.cfg'
         weights_path = os.path.join(weights_dir, 'yolov3.weights')

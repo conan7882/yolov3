@@ -89,7 +89,7 @@ def yolo_prediction(inputs, anchors, n_class, scale, scale_id=1, name='yolo_pred
                 cur_bbox, [4, 1, n_class], axis=-1, name='split_detection')
             bbox = correct_yolo_boxes(xy_grid_flatten, bbox_t_coord, anchors[anchor_id], scale)
             objectness = tf.nn.sigmoid(objectness_logits)
-            classes =  tf.nn.sigmoid(classes_logits)
+            classes = tf.nn.sigmoid(classes_logits)
 
             bbox_score.append(tf.multiply(objectness, classes))
             bbox_list.append(bbox)

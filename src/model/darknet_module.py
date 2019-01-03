@@ -16,8 +16,10 @@ def darknet_padding(inputs, fix_pad=1):
 def leaky(x):
     return L.leaky_relu(x, leak=0.1)
 
-def classification_fc(inputs, n_class=1000, pretrained_dict=None, init_w=None, init_b=tf.zeros_initializer(),
-                      wd=0, trainable=False, is_training=True, name='classification_fc'):
+def classification_fc(inputs, n_class=1000, pretrained_dict=None, 
+                      init_w=None, init_b=tf.zeros_initializer(),
+                      wd=0, trainable=False, is_training=True,
+                      name='classification_fc'):
     layer_dict = {}
     layer_dict['cur_input'] = inputs
 
@@ -32,8 +34,10 @@ def classification_fc(inputs, n_class=1000, pretrained_dict=None, init_w=None, i
         layer_dict['cur_input'] = tf.squeeze(layer_dict['cur_input'], [1, 2])
         return layer_dict['cur_input']
 
-def darkent53_conv(inputs, pretrained_dict=None, init_w=None, init_b=tf.zeros_initializer(),
-                   bn=True, wd=0, trainable=False, is_training=True, name='darkent53_conv'):
+def darkent53_conv(inputs, pretrained_dict=None,
+                   init_w=None, init_b=tf.zeros_initializer(),
+                   bn=True, wd=0, trainable=False, is_training=True,
+                   name='darkent53_conv'):
 
     def conv_layer(filter_size, out_dim, stride, custom_padding=None):
         arg_scope = tf.contrib.framework.arg_scope

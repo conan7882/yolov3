@@ -17,10 +17,12 @@ def parse_cfg(file_name):
     cfg_dict = {}
     for section in cfg_parser.sections():
         if section.startswith('net'):
-            cfg_dict['bsize'] = int(cfg_parser[section]['batch'])
+            cfg_dict['test_bsize'] = int(cfg_parser[section]['test_batch'])
+            cfg_dict['train_bsize'] = int(cfg_parser[section]['train_batch'])
             cfg_dict['rescale'] = [int(cfg_parser[section]['width']),
                                    int(cfg_parser[section]['height'])]
             cfg_dict['n_channel'] = int(cfg_parser[section]['channel'])
+            cfg_dict['multiscale'] = list(map(int, (cfg_parser[section]['multiscale']).split(',')))
 
         if section.startswith('yolo'):
             cfg_dict['obj_score_thr'] = float(cfg_parser[section]['obj_score_thresh'])
@@ -38,6 +40,9 @@ def parse_cfg(file_name):
 
         if section.startswith('path'):
             cfg_dict['coco_pretrained_npy_path'] = cfg_parser[section]['coco_pretrained_npy']
+            cfg_dict['yolo_feat_pretraind_npy'] = cfg_parser[section]['yolo_feat_pretraind_npy']
+            cfg_dict['save_path'] = cfg_parser[section]['save_path']
+            
             cfg_dict['test_image_path'] = cfg_parser[section]['test_image']
             cfg_dict['test_image_name'] = cfg_parser[section]['test_image_name']
 
