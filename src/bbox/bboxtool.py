@@ -40,7 +40,8 @@ def xyxy2yolotcoord(xyxy_bbox, anchor, stride, cxy):
     cxywh_bbox = xyxy2cxywh(np.array(xyxy_bbox))
     bbox_cxy, bbox_wh = np.split(cxywh_bbox, indices_or_sections=2, axis=-1)
     bbox_cxy = bbox_cxy / stride
-    bcxy = inverse_sigmoid(bbox_cxy - cxy)
+    bcxy = bbox_cxy - cxy
+    # bcxy = inverse_sigmoid(bbox_cxy - cxy)
     bwh = np.log(bbox_wh / anchor)
 
     return np.concatenate([bcxy, bwh], axis=-1) 

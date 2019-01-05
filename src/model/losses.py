@@ -26,6 +26,9 @@ def objectness_loss(label, logits, ignore_mask, name='obj_loss'):
 def bboxes_loss(label, pred_t_coord, obj_mask, name='bboxes_loss'):
     with tf.name_scope(name):
         # [bsize, len, 1]
+        bbox_xy, bbox_wh = tf.split(pred_t_coord, [2, 2], axis=-1)
+        pred_t_coord = tf.concat([tf.nn.sigmoid(bbox_xy), bbox_wh], axis=-1)
+
         bbox_loss = tf.reduce_sum(tf.square(pred_t_coord - label), axis=-1, keepdims=True)
         # only count for target anchors
         masked_bbox_loss = apply_mask(bbox_loss, obj_mask, val=1)

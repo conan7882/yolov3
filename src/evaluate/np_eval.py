@@ -98,8 +98,4 @@ def mAP(pred_bboxes,
         AP_classes[c_cnt] = np.mean(max_precision)
 
     return np.mean(AP_classes)
-         
-
-
-
         

@@ -11,7 +11,6 @@ import src.utils.viz as viz
 import src.model.layers as L
 import src.model.losses as losses
 from src.net.base import BaseModel
-# from src.bbox.bboxgt import TargetAnchor
 import src.utils.image as imagetool
 import src.model.yolo_module as yolo_module
 import src.model.darknet_module as darknet_module
@@ -20,38 +19,43 @@ import src.model.detection_bbox as detection_bbox
 INIT_W = tf.keras.initializers.he_normal()
 
 class YOLOv3(BaseModel):
+    """ model for yolov3 inference and training """
     def __init__(self,
                  n_channel,
                  n_class, 
                  pre_trained_path, 
                  anchors,
                  bsize=2,
-                 obj_score_thr=0.8,
-                 nms_iou_thr=0.45,
+                 # obj_score_thr=0.8,
+                 # nms_iou_thr=0.45,
                  feature_extractor_trainable=False,
                  detector_trainable=False):
+        """ 
+            Args:
+                n_channel (int): number of channels of input image
+                n_class (int): number of classes
+                pre_trained_path (str): path of pretrained model (.npy file)
+                anchors (List[List[float]]): clustering anchor box
+                bsize (int): batch size
+                obj_score_thr (float): confidence score threshold for selecting detected bbox
+                nms_iou_thr (float): IoU threshold for non maximum suppression
+                feature_extractor_trainable (bool): whether train feature extractor or not
+                detector_trainable (bool): whether train yolo layer or not
+        """
 
         self._n_channel = n_channel
         self._n_class = n_class
         self._feat_trainable = feature_extractor_trainable
         self._dete_trainable = detector_trainable
         self._bsize = bsize
-        # self._rescale_shape = L.get_shape2D(rescale_shape)
 
-        self._obj_score_thr = obj_score_thr
-        self._nms_iou_thr = nms_iou_thr
+        # self._obj_score_thr = obj_score_thr
+        # self._nms_iou_thr = nms_iou_thr
 
         self._anchors = anchors
         self._stride_list = [32, 16, 8]
 
-        # self._n_scale = len(self._stride_list)
-        # self._n_anchor = len(self._anchors[0])
-        # self._n_yolo_out_dim = (1 + 4 + self._n_class) * self._n_anchor
-
-        # if detector_trainable:
-        #     self.target_anchor = TargetAnchor(
-        #         [self._rescale_shape[0]], self._stride_list, self._anchors, self._n_class)
-
+        # load pre-trained model
         self._pretrained_dict = None
         if pre_trained_path:
             self._pretrained_dict = np.load(
@@ -66,14 +70,11 @@ class YOLOv3(BaseModel):
         self.label = tf.placeholder(
             tf.float32, [None, None, (1 + 4 + 1 + self._n_class)], 'label')
         self.lr = tf.placeholder(tf.float32, name='lr')
-        self.keep_prob = 1.
 
     def _create_valid_input(self):
         self.image = tf.placeholder(
             tf.float32, [None, None, None, self._n_channel], name='image')
         self.o_shape = tf.placeholder(tf.float32, [None, 2], 'o_shape')
-        # self.label = tf.placeholder(tf.int64, [None, 2], 'label')
-        self.keep_prob = 1.
 
     def create_train_model(self):
         self.set_is_training(is_training=True)
@@ -103,9 +104,13 @@ class YOLOv3(BaseModel):
     def _create_model(self, inputs):
         with tf.variable_scope('DarkNet53', reuse=tf.AUTO_REUSE):
             feat_out, route_1, route_2 = darknet_module.darkent53_conv(
-                inputs, pretrained_dict=self._pretrained_dict,
-                init_w=INIT_W, bn=True, wd=0, trainable=self._feat_trainable,
-                is_training=self.is_training, name='darkent53_conv')
+                inputs, 
+                init_w=INIT_W, 
+                bn=True, wd=0, 
+                trainable=self._feat_trainable,
+                is_training=self.is_training, 
+                pretrained_dict=self._pretrained_dict,
+                name='darkent53_conv')
             darknetFeat_list = [None, route_1, route_2]
 
         with tf.variable_scope('yolo_prediction', reuse=tf.AUTO_REUSE):
@@ -128,16 +133,29 @@ class YOLOv3(BaseModel):
 
                 scale = self._stride_list[scale_id]
                 yolo_out, prev_feat = yolo_module.yolo_layer(
-                    prev_feat, darknet_feat=darknetFeat_list[scale_id], up_sample=up_sample,
-                    n_filter=out_dim_list[scale_id], out_dim=linear_out_dim,
-                    pretrained_dict=self._pretrained_dict, init_w=INIT_W,
-                    bn=True, wd=0, trainable=self._dete_trainable, is_training=self.is_training,
-                    scale_id=scale_id+1, name='yolo')
-                bbox_score, bbox, bbox_t_coord, objectness_logits, classes_pred_logits = yolo_module.yolo_prediction(
-                    yolo_out, anchors, self._n_class, scale, scale_id+1, name='yolo_prediction')
+                    prev_feat, 
+                    darknet_feat=darknetFeat_list[scale_id], 
+                    up_sample=up_sample,
+                    n_filter=out_dim_list[scale_id], 
+                    out_dim=linear_out_dim,
+                    init_w=INIT_W,
+                    bn=True, wd=0, 
+                    trainable=self._dete_trainable, 
+                    is_training=self.is_training,
+                    scale_id=scale_id+1, 
+                    pretrained_dict=self._pretrained_dict, 
+                    name='yolo')
+
+                bbox_score, bbox, bbox_t_coord, objectness_logits, classes_pred_logits =\
+                    yolo_module.yolo_prediction(yolo_out, 
+                                                anchors, 
+                                                self._n_class, 
+                                                scale, 
+                                                scale_id+1, 
+                                                name='yolo_prediction')
                 
-                bbox_score_list.append(bbox_score)
                 bbox_list.append(bbox)
+                bbox_score_list.append(bbox_score)
                 objectness_list.append(objectness_logits)
                 classes_pred_list.append(classes_pred_logits)
                 bbox_t_coord_list.append(bbox_t_coord)
@@ -168,11 +186,9 @@ class YOLOv3(BaseModel):
                 classes_label, self.layers['classes_logits'], objectness_label)
             bbox_loss = losses.bboxes_loss(
                 bbox_label, self.layers['bbox_t_coord'], objectness_label)
-
             obj_loss = losses.objectness_loss(
                 objectness_label, self.layers['objectness_logits'], ignore_mask)
 
-            # print(cls_loss, bbox_loss, obj_loss)
             loss = (10 * cls_loss + 10 * bbox_loss + obj_loss) / bsize
             self.cls_loss = cls_loss / bsize
             self.bbox_loss = bbox_loss / bsize
@@ -182,8 +198,24 @@ class YOLOv3(BaseModel):
     def _get_optimizer(self):
         return tf.train.AdamOptimizer(learning_rate=self.lr)
 
-    def train_epoch(self, sess, train_data, target_anchor, init_lr, im_rescale,
+    def train_epoch(self,
+                    sess, 
+                    train_data, 
+                    target_anchor, 
+                    init_lr, 
+                    im_rescale,
                     summary_writer=None):
+        """ Train the model for one epoch
+
+            Args:
+                sess (tf.Session())
+                train_data (Dataflow): dataflow for training set
+                target_anchor (TargetAnchor): object for computing target prediction
+                init_lr (float): learning rate
+                im_rescale (int or list of two int): image size of model input
+                summary_writer (tf.summary)
+        """
+
         display_name_list = ['cls_loss', 'bbox_loss', 'obj_loss', 'loss']
         cur_summary = None
         lr = init_lr
@@ -199,7 +231,7 @@ class YOLOv3(BaseModel):
         while train_data.epochs_completed == cur_epoch:
             step += 1
             self.global_step += 1
-
+            # get one batch data
             batch_data = train_data.next_batch_dict()
             batch_gt = target_anchor.get_yolo_target_anchor(
                 batch_data['label'], batch_data['shape'], im_rescale, True)
@@ -226,7 +258,7 @@ class YOLOv3(BaseModel):
                     'train',
                     summary_val=cur_summary,
                     summary_writer=summary_writer)
-
+        # write summary 
         print('==== epoch: {}, lr:{} ===='.format(cur_epoch, lr))
         viz.display(
             self.global_step,
@@ -237,10 +269,31 @@ class YOLOv3(BaseModel):
             summary_val=cur_summary,
             summary_writer=summary_writer)
 
-    def predict_epoch_or_step(self, sess, dataflow, im_rescale,
-                              obj_score_thr, nms_iou_thr,
-                              label_dict, category_index, save_path,
+    def predict_epoch_or_step(self, 
+                              sess, 
+                              dataflow, 
+                              im_rescale,
+                              obj_score_thr, 
+                              nms_iou_thr,
+                              label_dict, 
+                              category_index, 
+                              save_path,
                               run_type='step'):
+        """ Model inference. Results are saved in save_path.
+
+            Args:
+                sess (tf.Session())
+                dataflow (Dataflow): dataflow for testing set
+                im_rescale (int or list of two int): image size of model input
+                obj_score_thr (float): confidence score threshold for selecting detected bbox
+                nms_iou_thr (float): IoU threshold for non maximum suppression
+                label_dict: a dict that maps integer ids to category names
+                category_index: a dict that maps integer ids to category dicts. e.g.
+                    {1: {1: 'dog'}, 2: {2: 'cat'}, ...}
+                save_path (str): path to save results
+                run_type (str): type of inference ('step': inference for one batch;
+                        'epoch': inference for one epoch)
+        """
 
         im_id = 0
         def run_step():

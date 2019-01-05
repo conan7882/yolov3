@@ -51,51 +51,75 @@ def get_args():
 def train():
     FLAGS = get_args()
 
-    pathconfig = parscfg.parse_cfg('configs/{}_path.cfg'.format(platform.node()))
-    pretrained_path = pathconfig['yolo_feat_pretraind_npy']
-    data_dir = pathconfig['test_image_path']
-    save_path = pathconfig['save_path']
-    im_name = pathconfig['test_image_name']
+    # pathconfig = parscfg.parse_cfg('configs/{}_path.cfg'.format(platform.node()))
+    # pretrained_path = pathconfig['yolo_feat_pretraind_npy']
+    # data_dir = pathconfig['test_image_path']
+    # save_path = pathconfig['save_path']
+    # im_name = pathconfig['test_image_name']
 
-    netconfig = parscfg.parse_cfg('configs/voc.cfg')
-    im_rescale = netconfig['rescale']
-    mutliscale = netconfig['multiscale']
-    n_channel = netconfig['n_channel']
-    test_bsize = netconfig['test_bsize']
-    train_bsize = netconfig['train_bsize']
-    obj_score_thr = netconfig['obj_score_thr']
-    nms_iou_thr = netconfig['nms_iou_thr']
-    n_class = netconfig['n_class']
-    anchors = netconfig['anchors']
-    ignore_thr = netconfig['ignore_thr']
+    # netconfig = parscfg.parse_cfg('configs/voc.cfg')
+    # im_rescale = netconfig['rescale']
+    # mutliscale = netconfig['multiscale']
+    # n_channel = netconfig['n_channel']
+    # test_bsize = netconfig['test_bsize']
+    # train_bsize = netconfig['train_bsize']
+    # obj_score_thr = netconfig['obj_score_thr']
+    # nms_iou_thr = netconfig['nms_iou_thr']
+    # n_class = netconfig['n_class']
+    # anchors = netconfig['anchors']
+    # ignore_thr = netconfig['ignore_thr']
+
+    config = parscfg.ConfigParser('configs/{}_path.cfg'.format(platform.node()),
+                                  'configs/voc.cfg')
+    im_rescale = config.im_rescale
     
     # Training
-    train_data, label_dict, category_index = loader.load_VOC(batch_size=train_bsize, rescale=im_rescale)
+    train_data, label_dict, category_index = loader.load_VOC(
+        batch_size=config.train_bsize, rescale=im_rescale)
     target_anchor = TargetAnchor(
-        mutliscale, [32, 16, 8], anchors, n_class, ignore_thr=ignore_thr)
+        config.mutliscale,
+        [32, 16, 8], 
+        config.anchors, 
+        config.n_class, 
+        ignore_thr=config.ignore_thr)
+
     train_model = YOLOv3(
-        n_channel=n_channel, n_class=n_class, anchors=anchors,
-        pre_trained_path=pretrained_path,
-        bsize=train_bsize, obj_score_thr=obj_score_thr, nms_iou_thr=nms_iou_thr,
-        feature_extractor_trainable=False, detector_trainable=True)
+        n_channel=config.n_channel,
+        n_class=config.n_class, 
+        anchors=config.anchors,
+        bsize=config.train_bsize, 
+        # obj_score_thr=config.obj_score_thr, 
+        # nms_iou_thr=config.nms_iou_thr,
+        feature_extractor_trainable=False, 
+        detector_trainable=True,
+        pre_trained_path=config.yolo_feat_pretrained_path,)
     train_model.create_train_model()
     
     # Validation
     # label_dict, category_index = loader.load_coco80_label_yolo()
     test_scale = 416
     image_data = loader.read_image(
-        im_name=im_name, n_channel=n_channel,
-        data_dir=data_dir, batch_size=test_bsize, rescale=test_scale)
+        im_name=config.im_name, 
+        n_channel=config.n_channel,
+        data_dir=config.data_dir, 
+        batch_size=config.test_bsize, 
+        rescale=test_scale)
     test_model = YOLOv3(
-        n_channel=n_channel, n_class=n_class, anchors=anchors,
-        pre_trained_path=pretrained_path,
-        bsize=test_bsize, obj_score_thr=obj_score_thr, nms_iou_thr=nms_iou_thr,
-        feature_extractor_trainable=False, detector_trainable=False)
+        n_channel=config.n_channel, 
+        n_class=config.n_class, 
+        anchors=config.anchors,
+        bsize=config.test_bsize, 
+        # obj_score_thr=config.obj_score_thr, 
+        # nms_iou_thr=config.nms_iou_thr,
+        feature_extractor_trainable=False, 
+        detector_trainable=False,
+        pre_trained_path=config.yolo_feat_pretrained_path,)
     test_model.create_valid_model()
 
     train_op = train_model.get_train_op()
     loss_op = train_model.get_loss()
 
+    writer = tf.summary.FileWriter(config.save_path)
     sessconfig = tf.ConfigProto()
     sessconfig.gpu_options.allow_growth = True
     with tf.Session(config=sessconfig) as sess:
@@ -110,54 +134,68 @@ def train():
                 lr = FLAGS.lr
 
             test_model.predict_epoch_or_step(
-                sess, image_data, test_scale, obj_score_thr, nms_iou_thr,
-                label_dict, category_index, save_path, run_type='epoch')
+                sess,
+                image_data, 
+                test_scale, 
+                config.obj_score_thr, 
+                config.nms_iou_thr,
+                label_dict, 
+                category_index, 
+                config.save_path, 
+                run_type='epoch')
             
             train_model.train_epoch(
-                sess, train_data, target_anchor, lr, im_rescale,
-                summary_writer=None)
+                sess, 
+                train_data, 
+                target_anchor, 
+                lr, 
+                im_rescale,
+                summary_writer=writer)
 
             if i > 0 and i % 10 == 0:
-                pick_id = np.random.choice(len(mutliscale))
-                im_rescale = mutliscale[pick_id]
+                pick_id = np.random.choice(len(config.mutliscale))
+                im_rescale = config.mutliscale[pick_id]
                 train_data.reset_image_rescale(rescale=im_rescale)
                 print('rescale to {}'.format(im_rescale))
 
 def detect():
-    pathconfig = parscfg.parse_cfg('configs/{}_path.cfg'.format(platform.node()))
-    pretrained_path = pathconfig['coco_pretrained_npy_path']
-    save_path = pathconfig['save_path']
-    data_dir = pathconfig['test_image_path']
-    im_name = pathconfig['test_image_name']
+    # pathconfig = parscfg.parse_cfg('configs/{}_path.cfg'.format(platform.node()))
+    # pretrained_path = pathconfig['coco_pretrained_npy_path']
+    # save_path = pathconfig['save_path']
+    # data_dir = pathconfig['test_image_path']
+    # im_name = pathconfig['test_image_name']
 
-    netconfig = parscfg.parse_cfg('configs/coco80.cfg')
-    im_rescale = netconfig['rescale']
-    n_channel = netconfig['n_channel']
-    bsize = netconfig['test_bsize']
-    obj_score_thr = netconfig['obj_score_thr']
-    nms_iou_thr = netconfig['nms_iou_thr']
-    n_class = netconfig['n_class']
-    anchors = netconfig['anchors']
+    # netconfig = parscfg.parse_cfg('configs/coco80.cfg')
+    # im_rescale = netconfig['rescale']
+    # n_channel = netconfig['n_channel']
+    # bsize = netconfig['test_bsize']
+    # obj_score_thr = netconfig['obj_score_thr']
+    # nms_iou_thr = netconfig['nms_iou_thr']
+    # n_class = netconfig['n_class']
+    # anchors = netconfig['anchors']
+
+    config = parscfg.ConfigParser('configs/{}_path.cfg'.format(platform.node()),
+                                  'configs/coco80.cfg')
 
     label_dict, category_index = loader.load_coco80_label_yolo()
     # Create a Dataflow object for test images
     image_data = loader.read_image(
-        im_name=im_name,
-        n_channel=n_channel,
-        data_dir=data_dir,
-        batch_size=bsize, 
-        rescale=im_rescale)
+        im_name=config.im_name,
+        n_channel=config.n_channel,
+        data_dir=config.data_dir,
+        batch_size=config.test_bsize, 
+        rescale=config.im_rescale)
 
     test_model = YOLOv3(
-        bsize=bsize,
-        n_channel=n_channel,
-        n_class=n_class, 
-        anchors=anchors,
-        obj_score_thr=obj_score_thr, 
-        nms_iou_thr=nms_iou_thr,
+        bsize=config.test_bsize,
+        n_channel=config.n_channel,
+        n_class=config.n_class, 
+        anchors=config.anchors,
+        # obj_score_thr=config.obj_score_thr, 
+        # nms_iou_thr=config.nms_iou_thr,
         feature_extractor_trainable=False, 
         detector_trainable=False,
-        pre_trained_path=pretrained_path,)
+        pre_trained_path=config.coco_pretrained_path,)
     test_model.create_valid_model()
 
     sessconfig = tf.ConfigProto()
@@ -168,12 +206,12 @@ def detect():
         test_model.predict_epoch_or_step(
             sess,
             image_data,
-            im_rescale,
-            obj_score_thr, 
-            nms_iou_thr,
+            config.im_rescale,
+            config.obj_score_thr, 
+            config.nms_iou_thr,
             label_dict, 
             category_index, 
-            save_path, 
+            config.save_path, 
             run_type='epoch')
 
 if __name__ == '__main__':
@@ -183,7 +221,9 @@ if __name__ == '__main__':
         train()
     if FLAGS.detect:
         detect()
-    
+
+    # config = parscfg.ConfigParser('configs/{}_path.cfg'.format(platform.node()), 'configs/voc.cfg')
+    # print(config.test_bsize)
     # def test1():
     #     p = 0
     #     def test():

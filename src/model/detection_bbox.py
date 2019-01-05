@@ -53,8 +53,8 @@ def detection(bbox_para, bbox_score, n_class, obj_score_thr, nms_iou_thr, label_
     nms_boxes = np.array(nms_boxes)
     nms_label_names = np.array(nms_label_names)
     nms_label_ids = np.array(nms_label_ids)
-    rescale_shape = np.array(rescale_shape)
-    image_shape = np.array(image_shape)
+    # rescale_shape = np.array(rescale_shape)
+    # image_shape = np.array(image_shape)
     nms_scores = np.array(nms_scores)
 
     nms_boxes = bboxtool.rescale_bbox(nms_boxes, rescale_shape, image_shape)

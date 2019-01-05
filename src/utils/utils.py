@@ -34,8 +34,9 @@ def get_shape2D(in_val):
     # in_val = int(in_val)
     if isinstance(in_val, int):
         return [in_val, in_val]
-    if isinstance(in_val, list):
-        assert len(in_val) == 2
+    # if isinstance(in_val, list):
+    if len(in_val) == 2:
+        # assert len(in_val) == 2
         return in_val
     raise RuntimeError('Illegal shape: {}'.format(in_val))
 
