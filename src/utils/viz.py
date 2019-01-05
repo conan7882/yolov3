@@ -8,6 +8,7 @@ import numpy as np
 import tensorflow as tf
 import matplotlib
 import platform
+import scipy.misc
 if platform.node() == 'arostitan':
     matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -38,14 +39,18 @@ def draw_bounding_box_on_image_array(im, bbox_list, class_list, score_list,
             min_score_thresh=.1,
             agnostic_mode=False,
             line_thickness=4)
-    plt.figure()
-    plt.imshow(bbox_im)
-    plt.axis('off')
+    
 
     if save_fig and save_name is not None:
-        plt.savefig(save_name, bbox_inches='tight', pad_inches=0)
+        scipy.misc.imsave(save_name, bbox_im)
+        # plt.savefig(save_name, bbox_inches='tight', pad_inches=0)
     else:
+        plt.figure()
+        plt.imshow(bbox_im)
+        plt.axis('off')
         plt.show()
+
+    plt.close()
 
 # def tf_draw_bounding_box(im, box, classes, scores, category_index,
 #                          max_boxes_to_draw=20, min_score_thresh=0.2):

@@ -15,8 +15,10 @@ import configs.parsecfg as parscfg
 import src.bbox.bboxgt as bboxgt
 import src.utils.viz as viz
 import src.utils.image as image
+import src.evaluate.np_eval as np_eval
 
-if __name__ == "__main__":
+
+def test_target_anchor():
     pathconfig = parscfg.parse_cfg('configs/{}_path.cfg'.format(platform.node()))
     pretrained_path = pathconfig['coco_pretrained_npy_path']
     data_dir = pathconfig['test_image_path']
@@ -86,4 +88,25 @@ if __name__ == "__main__":
     viz.draw_bounding_box(o_im, gt_bbox_para, label_list=None, box_type='xyxy')
     viz.draw_bounding_box(rescale_im, target_anchor_batch[0], label_list=None, box_type='xyxy')
 
+def test_mAP():
+    pred_bboxes = [[25,35,45,55], [35,45,55,65],[250,350,450,550],[250,350,450,550],[250,350,450,550],
+                    [45,65,55,75],[15,25,35,45],[250,350,450,550],[250,350,450,550],[35,25,55,45],[15,25,35,45],
+                    ]
+    gt_bboxes = [[25,35,45,55], [35,45,55,65],[45,65,55,75],[15,25,35,45],[35,25,55,45],[45,65,55,75],[15,25,35,45],[35,25,55,45]]
+    pred_classes = [1,1,1,1,1,1,1,1,1,1, 2]
+    gt_classes = [1,1,1,1,1,2,2,2]
+    pred_conf = [0.9, 0.9, 0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1, 0.9]
+    IoU_thr = 0.5
+    pred_im_size = 1
+    gt_im_size = 1
+
+    re = np_eval.mAP(
+        pred_bboxes, pred_classes, pred_conf, gt_bboxes,
+        gt_classes, IoU_thr, pred_im_size, gt_im_size)
+
+    print(re)
+
+
+if __name__ == "__main__":
+    test_mAP()
         

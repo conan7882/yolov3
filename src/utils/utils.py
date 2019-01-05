@@ -4,6 +4,8 @@
 # Author: Qian Ge <geqian1001@gmail.com>
 
 
+import numpy as np
+
 def make_list(inputs):
     if not isinstance(inputs, list):
         return [inputs]
@@ -36,3 +38,12 @@ def get_shape2D(in_val):
         assert len(in_val) == 2
         return in_val
     raise RuntimeError('Illegal shape: {}'.format(in_val))
+
+def to_nparray(lists):
+    """ convert list of list into np.array 
+
+        Args:
+            lists: list[list[]]
+    """
+    return [np.array(l) for l in lists]
+

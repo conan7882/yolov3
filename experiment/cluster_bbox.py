@@ -34,6 +34,10 @@ def kmeans_clustering(xml_dir, k):
     avg_iou = kmeans_bbox.mean_iou()
     print(centroid)
     print(avg_iou)
+    def bbox_area(bbox): 
+        return bbox[2] * bbox[3]
+    sorted_centroid = sorted(centroid, key=bbox_area)
+    print(list(np.reshape([[b[2], b[3]] for b in sorted_centroid], -1)))
 
 def get_args():
     parser = argparse.ArgumentParser()

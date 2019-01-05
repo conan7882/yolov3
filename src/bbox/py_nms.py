@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 # File: py_nms.py
 # Author: Qian Ge <geqian1001@gmail.com>
-
-# reference code: https://www.pyimagesearch.com/2015/02/16/faster-non-maximum-suppression-python/
+# reference:
+# https://www.pyimagesearch.com/2015/02/16/faster-non-maximum-suppression-python/
 
 import numpy as np
 

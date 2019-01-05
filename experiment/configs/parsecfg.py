@@ -8,6 +8,12 @@ import configparser
 import numpy as np
 
 
+def Config(object):
+    def __init__(self):
+        pass
+
+
+
 def parse_cfg(file_name):
     # section_counters = defaultdict(int)
     cfg_stream = open(file_name)
@@ -28,6 +34,7 @@ def parse_cfg(file_name):
             cfg_dict['obj_score_thr'] = float(cfg_parser[section]['obj_score_thresh'])
             cfg_dict['nms_iou_thr'] = float(cfg_parser[section]['nms_iou_thresh'])
             cfg_dict['n_class'] = int(cfg_parser[section]['classes'])
+            cfg_dict['ignore_thr'] = float(cfg_parser[section]['ignore_thr'])
 
             anchors = list(map(float, (cfg_parser[section]['anchors']).split(',')))
             anchor_mask = list(map(int, (cfg_parser[section]['anchor_mask']).split(',')))

@@ -43,7 +43,7 @@ def get_args():
     #                     help='Rescale input image with shorter side = rescale')
     # parser.add_argument('--bsize', type=int, default=2,
     #                     help='Batch size')
-    parser.add_argument('--lr', type=float, default=0.001,
+    parser.add_argument('--lr', type=float, default=0.1,
                         help='Batch size')
     
     return parser.parse_args()
@@ -67,26 +67,28 @@ def train():
     nms_iou_thr = netconfig['nms_iou_thr']
     n_class = netconfig['n_class']
     anchors = netconfig['anchors']
+    ignore_thr = netconfig['ignore_thr']
     
     # Training
     train_data, label_dict, category_index = loader.load_VOC(batch_size=train_bsize, rescale=im_rescale)
     target_anchor = TargetAnchor(
-        [im_rescale], [32, 16, 8], anchors, n_class)
+        mutliscale, [32, 16, 8], anchors, n_class, ignore_thr=ignore_thr)
     train_model = YOLOv3(
         n_channel=n_channel, n_class=n_class, anchors=anchors,
-        rescale_shape=im_rescale, pre_trained_path=pretrained_path,
+        pre_trained_path=pretrained_path,
         bsize=train_bsize, obj_score_thr=obj_score_thr, nms_iou_thr=nms_iou_thr,
         feature_extractor_trainable=False, detector_trainable=True)
     train_model.create_train_model()
     
     # Validation
     # label_dict, category_index = loader.load_coco80_label_yolo()
+    test_scale = 416
     image_data = loader.read_image(
         im_name=im_name, n_channel=n_channel,
-        data_dir=data_dir, batch_size=test_bsize, rescale=im_rescale)
+        data_dir=data_dir, batch_size=test_bsize, rescale=test_scale)
     test_model = YOLOv3(
         n_channel=n_channel, n_class=n_class, anchors=anchors,
-        rescale_shape=im_rescale, pre_trained_path=pretrained_path,
+        pre_trained_path=pretrained_path,
         bsize=test_bsize, obj_score_thr=obj_score_thr, nms_iou_thr=nms_iou_thr,
         feature_extractor_trainable=False, detector_trainable=False)
     test_model.create_valid_model()
@@ -94,52 +96,32 @@ def train():
     train_op = train_model.get_train_op()
     loss_op = train_model.get_loss()
 
-    with tf.Session() as sess:
+    sessconfig = tf.ConfigProto()
+    sessconfig.gpu_options.allow_growth = True
+    with tf.Session(config=sessconfig) as sess:
         sess.run(tf.global_variables_initializer())
 
-        for i in range(10):
+        for i in range(150):
+            if i >= 100:
+                lr = FLAGS.lr / 100.
+            elif i >= 50:
+                lr = FLAGS.lr / 10.
+            else:
+                lr = FLAGS.lr
+
             test_model.predict_epoch_or_step(
-                sess, image_data, im_rescale, obj_score_thr, nms_iou_thr,
-                label_dict, category_index, save_path, run_type='step')
-            # print('epoch: {}'.format(i))
-            # batch_data = image_data.next_batch_dict()
-            # bbox_score, bbox_para = sess.run(
-            #     [test_model.layers['bbox_score'], test_model.layers['bbox']],
-            #     feed_dict={test_model.image: batch_data['image']})
-            # for idx, (score, para) in enumerate(zip(bbox_score, bbox_para)):
-            #     nms_boxes, nms_scores, nms_label_names, nms_label_ids =\
-            #         detection_bbox.detection(
-            #             para, score, n_class=n_class, obj_score_thr=obj_score_thr,
-            #             nms_iou_thr=nms_iou_thr, label_dict=label_dict,
-            #             image_shape=batch_data['shape'][idx], rescale_shape=im_rescale)
-            #     original_im = imagetool.rescale_image(
-            #         batch_data['image'][idx] * 255, batch_data['shape'][idx])
-            #     viz.draw_bounding_box_on_image_array(
-            #         original_im, bbox_list=nms_boxes, class_list=nms_label_ids,
-            #         score_list=nms_scores, category_index=category_index,
-            #         save_name=os.path.join(save_path, 'im_{}.png'.format(idx)),
-            #         save_fig=True)
-            #     print(nms_label_names)
+                sess, image_data, test_scale, obj_score_thr, nms_iou_thr,
+                label_dict, category_index, save_path, run_type='epoch')
             
             train_model.train_epoch(
-                sess, train_data, target_anchor, FLAGS.lr, im_rescale,
+                sess, train_data, target_anchor, lr, im_rescale,
                 summary_writer=None)
-            # cur_epoch = train_data.epochs_completed
-            # step = 0
-            # while train_data.epochs_completed == cur_epoch:
-            #     step += 1
-            #     batch_data = train_data.next_batch_dict()
-            #     batch_gt = target_anchor.get_yolo_target_anchor(
-            #         batch_data['label'], batch_data['shape'], im_rescale, True)
 
-            #     _, loss = sess.run(
-            #         [train_op, loss_op],
-            #         feed_dict={train_model.image: batch_data['image'],
-            #                    train_model.o_shape: batch_data['shape'],
-            #                    train_model.label: batch_gt,
-            #                    train_model.lr: FLAGS.lr})
-            #     print('step: {}, loss: {}'.format(step, loss))
-            # break
+            if i > 0 and i % 10 == 0:
+                pick_id = np.random.choice(len(mutliscale))
+                im_rescale = mutliscale[pick_id]
+                train_data.reset_image_rescale(rescale=im_rescale)
+                print('rescale to {}'.format(im_rescale))
 
 def detect():
     pathconfig = parscfg.parse_cfg('configs/{}_path.cfg'.format(platform.node()))
@@ -160,58 +142,39 @@ def detect():
     label_dict, category_index = loader.load_coco80_label_yolo()
     # Create a Dataflow object for test images
     image_data = loader.read_image(
-        im_name=im_name, n_channel=n_channel,
-        data_dir=data_dir, batch_size=bsize, rescale=im_rescale)
+        im_name=im_name,
+        n_channel=n_channel,
+        data_dir=data_dir,
+        batch_size=bsize, 
+        rescale=im_rescale)
 
     test_model = YOLOv3(
-        n_channel=n_channel, n_class=n_class, anchors=anchors,
-        rescale_shape=im_rescale, pre_trained_path=pretrained_path,
-        bsize=bsize, obj_score_thr=obj_score_thr, nms_iou_thr=nms_iou_thr,
-        feature_extractor_trainable=False, detector_trainable=False)
+        bsize=bsize,
+        n_channel=n_channel,
+        n_class=n_class, 
+        anchors=anchors,
+        obj_score_thr=obj_score_thr, 
+        nms_iou_thr=nms_iou_thr,
+        feature_extractor_trainable=False, 
+        detector_trainable=False,
+        pre_trained_path=pretrained_path,)
     test_model.create_valid_model()
 
-    with tf.Session() as sess:
+    sessconfig = tf.ConfigProto()
+    sessconfig.gpu_options.allow_growth = True
+    with tf.Session(config=sessconfig) as sess:
         sess.run(tf.global_variables_initializer())
-        im_id = 0
-        while image_data.epochs_completed < 1:
-            batch_data = image_data.next_batch_dict()
-            # get batch file names
-            batch_file_name = image_data.get_batch_file_name()[0]
-            # get prediction results
-            # det_score, det_bbox, det_class = sess.run(
-            #     [test_model.layers['det_score'], test_model.layers['det_bbox'],
-            #      test_model.layers['det_class']],
-            #     feed_dict={test_model.image: batch_data['image'],
-            #                test_model.o_shape: batch_data['shape']})
 
-            # for idx, (score, para, class_id) in enumerate(zip(det_score, det_bbox, det_class)):
-            #     nms_labels = [label_dict[i] for i in class_id]
-            #     viz.draw_bounding_box_on_image_array(
-            #         skimage.transform.resize(
-            #             batch_data['image'][idx] * 255,
-            #             batch_data['shape'][idx],
-            #             preserve_range=True),
-            #         bbox_list=para, class_list=list(map(int, class_id)),
-            #         score_list=score, category_index=category_index)
-
-            bbox_score, bbox_para = sess.run(
-                [test_model.layers['bbox_score'], test_model.layers['bbox']],
-                feed_dict={test_model.image: batch_data['image']})
-
-            for idx, (score, para) in enumerate(zip(bbox_score, bbox_para)):
-                nms_boxes, nms_scores, nms_label_names, nms_label_ids = detection_bbox.detection(
-                    para, score, n_class=n_class, obj_score_thr=obj_score_thr,
-                    nms_iou_thr=nms_iou_thr, label_dict=label_dict,
-                    image_shape=batch_data['shape'][idx], rescale_shape=im_rescale)
-                print(im_id)
-                # original_im = imagetool.rescale_image(
-                #     batch_data['image'][idx] * 255, batch_data['shape'][idx])
-                # viz.draw_bounding_box_on_image_array(
-                #     original_im, bbox_list=nms_boxes, class_list=nms_label_ids,
-                #     score_list=nms_scores, category_index=category_index,
-                #     save_name=os.path.join(save_path, 'im_{}.png'.format(im_id)),
-                #     save_fig=True)
-                im_id += 1
+        test_model.predict_epoch_or_step(
+            sess,
+            image_data,
+            im_rescale,
+            obj_score_thr, 
+            nms_iou_thr,
+            label_dict, 
+            category_index, 
+            save_path, 
+            run_type='epoch')
 
 if __name__ == '__main__':
     FLAGS = get_args()
@@ -221,3 +184,14 @@ if __name__ == '__main__':
     if FLAGS.detect:
         detect()
     
+    # def test1():
+    #     p = 0
+    #     def test():
+    #         nonlocal p
+    #         print(p)
+    #         p+=1
+
+    #     test()
+    #     test()
+    # test1()
+

@@ -4,6 +4,7 @@
 # Author: Qian Ge <geqian1001@gmail.com>
 
 import numpy as np
+import src.utils.utils as utils
 
 SMALL_NUM = 1e-6
 
@@ -107,6 +108,8 @@ def xyxy2yxyx(bbox_list):
 def rescale_bbox(bbox_list, from_shape, to_shape):
     # from_shape, to_shape [h, w]
     # bbox_list[i] [x, y, x, y] or [cx, xy, w, h]
+    from_shape = utils.get_shape2D(from_shape)
+    to_shape = utils.get_shape2D(to_shape)
     rescale_bbox = np.stack(
         [bbox_list[:, 0] / from_shape[1] * to_shape[1],
          bbox_list[:, 1] / from_shape[0] * to_shape[0],
@@ -180,6 +183,28 @@ def bbox_list_IOU(bbox_list_1, bbox_list_2, align=True):
         return iou_list.transpose()
     else:
         return iou_list
+
+# def bbox_ele_IoU(bbox_list_1, bbox_list_2):
+#     # box [xmin, ymin, xmax, ymax]
+#     bbox_list_1 = np.array(bbox_list_1)
+#     bbox_list_2 = np.array(bbox_list_2)
+#     if len(bbox_list_1.shape) == 1:
+#         bbox_list_1 = [bbox_list_1]
+#     elif len(bbox_list_1.shape) > 2:
+#         raise ValueError('Incorrect shape of bbox_list_1')
+
+#     if len(bbox_list_2.shape) == 1:
+#         bbox_list_2 = [bbox_list_2]
+#     elif len(bbox_list_2.shape) > 2:
+#         raise ValueError('Incorrect shape of bbox_list_2')
+
+#     assert len(bbox_list_1) == len(bbox_list_2),\
+#         'Number of two list of bbox have to be the same for\
+#          elementwise comparison.'
+
+#     h_1, w_1 = bbox_list_1[3] - bbox_list_1[1], bbox_list_1[2] - bbox_list_1[0]
+#     h_2, w_2 = bbox_list_2[3] - bbox_list_2[1], bbox_list_2[2] - bbox_list_2[0]
+#     area_1, area_2 = h_1 * w_1, h_2 * w_2
 
 
 if __name__ == '__main__':

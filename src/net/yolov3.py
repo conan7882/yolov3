@@ -20,16 +20,23 @@ import src.model.detection_bbox as detection_bbox
 INIT_W = tf.keras.initializers.he_normal()
 
 class YOLOv3(BaseModel):
-    def __init__(self, n_channel, n_class, pre_trained_path, anchors,
-                 bsize=2, obj_score_thr=0.8, nms_iou_thr=0.45,
-                 feature_extractor_trainable=False, detector_trainable=False,
-                 rescale_shape=None):
+    def __init__(self,
+                 n_channel,
+                 n_class, 
+                 pre_trained_path, 
+                 anchors,
+                 bsize=2,
+                 obj_score_thr=0.8,
+                 nms_iou_thr=0.45,
+                 feature_extractor_trainable=False,
+                 detector_trainable=False):
+
         self._n_channel = n_channel
         self._n_class = n_class
         self._feat_trainable = feature_extractor_trainable
         self._dete_trainable = detector_trainable
         self._bsize = bsize
-        self._rescale_shape = L.get_shape2D(rescale_shape)
+        # self._rescale_shape = L.get_shape2D(rescale_shape)
 
         self._obj_score_thr = obj_score_thr
         self._nms_iou_thr = nms_iou_thr
@@ -53,15 +60,12 @@ class YOLOv3(BaseModel):
         self.layers = {}
 
     def _create_train_input(self):
+        self.o_shape = tf.placeholder(tf.float32, [None, 2], 'o_shape')
         self.image = tf.placeholder(
             tf.float32, [None, None, None, self._n_channel], name='image')
-        self.o_shape = tf.placeholder(tf.float32, [None, 2], 'o_shape')
         self.label = tf.placeholder(
-            tf.float32,
-            [None, None, (1 + 4 + 1 + self._n_class)],
-            'label')
+            tf.float32, [None, None, (1 + 4 + 1 + self._n_class)], 'label')
         self.lr = tf.placeholder(tf.float32, name='lr')
-        # self.label = tf.placeholder(tf.int64, [None, 2], 'label')
         self.keep_prob = 1.
 
     def _create_valid_input(self):
@@ -90,6 +94,8 @@ class YOLOv3(BaseModel):
         self._create_valid_input()
         self.layers['bbox_score'], self.layers['bbox'], _, _, _\
             = self._create_model(self.image)
+
+        self.epoch_id = 0
 
         # self.layers['det_score'], self.layers['det_bbox'], self.layers['det_class'] =\
         #     self._get_detection(self.layers['bbox_score'], self.layers['bbox'])
@@ -150,24 +156,6 @@ class YOLOv3(BaseModel):
             objectness_list = make_tensor_and_batch_flatten(objectness_list, 1)
 
             return bbox_score_list, bbox_list, bbox_t_coord_list, objectness_list, classes_pred_list
-
-    def _get_detection(self, bbox_score_list, bbox_para_list):
-        det_score_list = []
-        det_bbox_list = []
-        det_class_list = []
-
-        for batch_id in range(self._bsize):
-            bbox_score = bbox_score_list[batch_id]
-            bbox_para = bbox_para_list[batch_id]
-
-            det_score, det_bbox, det_class = yolo_module.get_detection(
-                bbox_score, bbox_para, self._n_class,
-                self._obj_score_thr, self._nms_iou_thr, max_boxes=20,
-                rescale_shape=self._rescale_shape, original_shape=self.o_shape[batch_id])
-            det_score_list.append(det_score)
-            det_bbox_list.append(det_bbox)
-            det_class_list.append(det_class)
-        return det_score_list, det_bbox_list, det_class_list
 
     def _get_loss(self):
         with tf.name_scope('loss'):
@@ -254,36 +242,56 @@ class YOLOv3(BaseModel):
                               label_dict, category_index, save_path,
                               run_type='step'):
 
-        batch_data = dataflow.next_batch_dict()
-        bbox_score, bbox_para = sess.run(
-            [self.layers['bbox_score'], self.layers['bbox']],
-            feed_dict={self.image: batch_data['image']})
-        for idx, (score, para) in enumerate(zip(bbox_score, bbox_para)):
-            nms_boxes, nms_scores, nms_label_names, nms_label_ids =\
-                detection_bbox.detection(
-                    para, score, n_class=self._n_class, obj_score_thr=obj_score_thr,
-                    nms_iou_thr=nms_iou_thr, label_dict=label_dict,
-                    image_shape=batch_data['shape'][idx], rescale_shape=im_rescale)
-            original_im = imagetool.rescale_image(
-                batch_data['image'][idx] * 255, batch_data['shape'][idx])
-            viz.draw_bounding_box_on_image_array(
-                original_im, bbox_list=nms_boxes, class_list=nms_label_ids,
-                score_list=nms_scores, category_index=category_index,
-                save_name=os.path.join(save_path, 'im_{}.png'.format(idx)),
-                save_fig=True)
-            print(nms_label_names)
+        im_id = 0
+        def run_step():
+            nonlocal im_id
+            batch_data = dataflow.next_batch_dict()
+            bbox_score, bbox_para = sess.run(
+                [self.layers['bbox_score'], self.layers['bbox']],
+                feed_dict={self.image: batch_data['image']})
+            for idx, (score, para) in enumerate(zip(bbox_score, bbox_para)):
+                
+                nms_boxes, nms_scores, nms_label_names, nms_label_ids =\
+                    detection_bbox.detection(
+                        para, score, n_class=self._n_class, obj_score_thr=obj_score_thr,
+                        nms_iou_thr=nms_iou_thr, label_dict=label_dict,
+                        image_shape=batch_data['shape'][idx], rescale_shape=im_rescale)
+                original_im = imagetool.rescale_image(
+                    batch_data['image'][idx] * 255, batch_data['shape'][idx])
+                viz.draw_bounding_box_on_image_array(
+                    original_im, bbox_list=nms_boxes, class_list=nms_label_ids,
+                    score_list=nms_scores, category_index=category_index,
+                    save_name=os.path.join(save_path, 'epoch_{}_im_{}.png'.format(self.epoch_id, im_id)),
+                    save_fig=True)
+                im_id += 1
+                print(nms_label_names)
+        im_id = 0
+        if run_type == 'step':
+            run_step()
+        elif run_type == 'epoch':
+            dataflow.reset_epochs_completed()
+            while dataflow.epochs_completed == 0:
+                run_step()
+            self.epoch_id += 1
+        else:
+            raise ValueError("Invalid run_type: {}! Has to be 'step' or 'epoch'.".format(run_type))
 
 
-    # def _get_target_anchor(self, rescale):
-    #     # self.target_anchor.get_target_anchor(
-    #     #     gt_bbox_batch, im_shape_batch, rescale)
+    # def _get_detection(self, bbox_score_list, bbox_para_list):
+    #     det_score_list = []
+    #     det_bbox_list = []
+    #     det_class_list = []
 
-    #     gt_mask =tf.py_func(
-    #         self.target_anchor.get_target_anchor,
-    #         [self.label, self.o_shape, rescale,],
-    #         tf.float32,
-    #         name="target_anchors")
+    #     for batch_id in range(self._bsize):
+    #         bbox_score = bbox_score_list[batch_id]
+    #         bbox_para = bbox_para_list[batch_id]
 
-    #     return gt_mask
-
+    #         det_score, det_bbox, det_class = yolo_module.get_detection(
+    #             bbox_score, bbox_para, self._n_class,
+    #             self._obj_score_thr, self._nms_iou_thr, max_boxes=20,
+    #             rescale_shape=self._rescale_shape, original_shape=self.o_shape[batch_id])
+    #         det_score_list.append(det_score)
+    #         det_bbox_list.append(det_bbox)
+    #         det_class_list.append(det_class)
+    #     return det_score_list, det_bbox_list, det_class_list
 
