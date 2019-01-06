@@ -81,9 +81,10 @@ def load_VOC(batch_size=1, rescale=416):
         class_dict=class_name_dict,
         image_dir=im_dir,
         xml_dir=xml_dir,
+        max_bbox_per_image=50,
         n_channel=3,
         shuffle=True,
-        batch_dict_name=['image', 'label', 'shape'],
+        batch_dict_name=['image', 'label', 'shape', 'boxes'],
         pf_list=(normalize_im, rescale))
     train_data.setup(epoch_val=0, batch_size=batch_size)
 
@@ -162,24 +163,24 @@ if __name__ == '__main__':
     xml_dir = '/Users/gq/workspace/Dataset/VOCdevkit/VOC2007/Annotations/'
     # 
     # print(class_dict, reverse_class_dict)
-    dataflow, class_dict = load_VOC(batch_size=2)
+    dataflow, class_dict, category_index = load_VOC(batch_size=2)
     # print(dataflow._file_name_list)
 
     batch_date = dataflow.next_batch_dict()
-    # print(batch_date['label'])
-    print(batch_date['image'][0].shape)
+    print(batch_date['boxes'])
+    # print(batch_date['image'][0].shape)
 
-    dataflow.reset_image_rescale(rescale=320)
-    batch_date = dataflow.next_batch_dict()
+    # dataflow.reset_image_rescale(rescale=320)
+    # batch_date = dataflow.next_batch_dict()
     # print(batch_date['label'])
-    print(batch_date['image'][0].shape)
+    # print(batch_date['image'][0].shape)
 
     # print([[bbox[0] for bbox in bbox_list] for bbox_list in batch_date['label']])
     # box_list = ([[(bbox[1]) for bbox in bbox_list] for bbox_list in batch_date['label']])
     # print(box_list)
-    # im = imagetool.rescale_image(batch_date['image'][0]*255, batch_date['shape'][0])
-    # viz.draw_bounding_box(im, box_list[0])
-    plt.figure()
-    plt.imshow(batch_date['image'][0])
-    plt.show()
+    im = imagetool.rescale_image(batch_date['image'][0]*255, batch_date['shape'][0])
+    viz.draw_bounding_box(im, batch_date['boxes'][0])
+    # plt.figure()
+    # plt.imshow(batch_date['image'][0])
+    # plt.show()
 

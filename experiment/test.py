@@ -16,6 +16,7 @@ import src.bbox.bboxgt as bboxgt
 import src.utils.viz as viz
 import src.utils.image as image
 import src.evaluate.np_eval as np_eval
+import src.bbox.bboxtool as bboxtool
 
 
 def test_target_anchor():
@@ -106,7 +107,18 @@ def test_mAP():
 
     print(re)
 
+def test_IoU():
+    b_1 = [[0, 2, 1, 3], [0, 2, 1, 3], [0, 5, 7, 10], [0, 0, 0, 0]] 
+    b_2 = [[0, 2+5.5, 1+5.5, 3+5.5], [0, 2+0.5, 1+0.5, 3+0.5]]
+    # b_2 = [i + 0.5 for i in b_2]
+    # print(bbox_IOU(b_1, b_2, align=True))
+
+    re = bboxtool.bbox_list_IOU(b_1, b_2, align=False)
+    print(re)
+    re = bboxtool.bbox_list_IOU(b_1, b_2, align=True)
+    print(re)
+
 
 if __name__ == "__main__":
-    test_mAP()
+    test_IoU()
         

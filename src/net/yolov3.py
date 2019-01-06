@@ -15,6 +15,7 @@ import src.utils.image as imagetool
 import src.model.yolo_module as yolo_module
 import src.model.darknet_module as darknet_module
 import src.model.detection_bbox as detection_bbox
+import src.bbox.tfbboxtool as tfbboxtool
 
 INIT_W = tf.keras.initializers.he_normal()
 
@@ -26,8 +27,7 @@ class YOLOv3(BaseModel):
                  pre_trained_path, 
                  anchors,
                  bsize=2,
-                 # obj_score_thr=0.8,
-                 # nms_iou_thr=0.45,
+                 ignore_thr=0.5,
                  feature_extractor_trainable=False,
                  detector_trainable=False):
         """ 
@@ -49,11 +49,9 @@ class YOLOv3(BaseModel):
         self._dete_trainable = detector_trainable
         self._bsize = bsize
 
-        # self._obj_score_thr = obj_score_thr
-        # self._nms_iou_thr = nms_iou_thr
-
         self._anchors = anchors
         self._stride_list = [32, 16, 8]
+        self._ignore_thr = ignore_thr
 
         # load pre-trained model
         self._pretrained_dict = None
@@ -69,6 +67,9 @@ class YOLOv3(BaseModel):
             tf.float32, [None, None, None, self._n_channel], name='image')
         self.label = tf.placeholder(
             tf.float32, [None, None, (1 + 4 + 1 + self._n_class)], 'label')
+        # xyxy
+        self.true_boxes = tf.placeholder(
+            tf.float32, [None, None, 4], 'true_boxes')
         self.lr = tf.placeholder(tf.float32, name='lr')
 
     def _create_valid_input(self):
@@ -79,9 +80,9 @@ class YOLOv3(BaseModel):
     def create_train_model(self):
         self.set_is_training(is_training=True)
         self._create_train_input()
-        _, _, self.layers['bbox_t_coord'], self.layers['objectness_logits'], self.layers['classes_logits']\
+        _, self.layers['pred_bbox'], self.layers['bbox_t_coord'], self.layers['objectness_logits'], self.layers['classes_logits']\
             = self._create_model(self.image)
-        self.loss = self._get_loss()
+        # self.loss = self._get_loss()
 
         self.train_op = self.get_train_op()
         self.loss_op = self.get_loss()
@@ -165,7 +166,7 @@ class YOLOv3(BaseModel):
 
             def make_tensor_and_batch_flatten(inputs, last_dim):
                 inputs = tf.concat(inputs, axis=1) # [bsize, -1, last_dim] 
-                return tf.reshape(inputs, (bsize, -1, last_dim)) # [bsize, -1, n_class]
+                return tf.reshape(inputs, (bsize, -1, last_dim)) # [bsize, -1, last_dim]
 
             bbox_score_list = make_tensor_and_batch_flatten(bbox_score_list, self._n_class)
             classes_pred_list = make_tensor_and_batch_flatten(classes_pred_list, self._n_class)
@@ -175,6 +176,17 @@ class YOLOv3(BaseModel):
 
             return bbox_score_list, bbox_list, bbox_t_coord_list, objectness_list, classes_pred_list
 
+    def _get_ignore_mask(self, pred_bbox, true_bbox, objectness_label):
+        # pred_bbox cxywh [bsize, n_prediction, 4]
+        # true_bbox xyxy [bsize, max_bbox_per_im, 4]
+
+        # [bdize, n_prediction, max_bbox_per_im]
+        iou = tfbboxtool.batch_bbox_IoU(pred_bbox, true_bbox)
+        best_ious = tf.reduce_max(iou, axis=-1, keepdims=True)
+        ignore_mask = tf.logical_or(tf.cast(objectness_label, tf.bool),
+                                    (best_ious < self._ignore_thr))
+        return tf.to_float(ignore_mask)
+
     def _get_loss(self):
         with tf.name_scope('loss'):
             bsize = tf.cast(tf.shape(self.o_shape)[0], tf.float32)
@@ -182,14 +194,16 @@ class YOLOv3(BaseModel):
             bbox_label, objectness_label, ignore_mask, classes_label = tf.split(
                 self.label, [4, 1, 1, self._n_class], axis=-1, name='split_label')
 
+            ignore_mask = self._get_ignore_mask(
+                self.layers['pred_bbox'], self.true_boxes, objectness_label)
+            obj_loss = losses.objectness_loss(
+                objectness_label, self.layers['objectness_logits'], ignore_mask)
             cls_loss = losses.class_loss(
                 classes_label, self.layers['classes_logits'], objectness_label)
             bbox_loss = losses.bboxes_loss(
                 bbox_label, self.layers['bbox_t_coord'], objectness_label)
-            obj_loss = losses.objectness_loss(
-                objectness_label, self.layers['objectness_logits'], ignore_mask)
-
-            loss = (10 * cls_loss + 10 * bbox_loss + obj_loss) / bsize
+            
+            loss = (1. * cls_loss + 1. * bbox_loss + obj_loss) / bsize
             self.cls_loss = cls_loss / bsize
             self.bbox_loss = bbox_loss / bsize
             self.obj_loss = obj_loss / bsize
@@ -241,6 +255,7 @@ class YOLOv3(BaseModel):
                  self.bbox_loss, self.obj_loss],
                 feed_dict={self.image: batch_data['image'],
                            self.o_shape: batch_data['shape'],
+                           self.true_boxes: batch_data['boxes'],
                            self.label: batch_gt,
                            self.lr: lr})
 

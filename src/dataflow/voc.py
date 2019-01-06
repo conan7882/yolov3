@@ -7,18 +7,19 @@ import os
 import re
 import numpy as np
 
-from src.dataflow.base import DataFlow
+from src.dataflow.base import DetectionDataFlow
 import src.utils.utils as utils
 from src.utils.dataflow import identity, fill_pf_list, get_file_list
 from src.utils.dataflow import load_image, get_voc_bbox, parse_bbox_xml
 
 
-class VOC(DataFlow):
+class VOC(DetectionDataFlow):
     """ dataflow for CelebA dataset """
     def __init__(self,
                  class_dict,
                  image_dir='',
                  xml_dir='',
+                 max_bbox_per_image=50,
                  n_channel=3,
                  shuffle=True,
                  batch_dict_name=None,
@@ -38,6 +39,7 @@ class VOC(DataFlow):
         self._n_channel = n_channel
         self._pf_list = pf_list
 
+
         def read_image(file_name):
             """ read color face image with pre-process function """
             image = load_image(file_name, read_channel=n_channel,  pf=pf_list[0])
@@ -48,8 +50,10 @@ class VOC(DataFlow):
                 Returns:
                     [(class_id, [xmin, ymin, xmax, ymax])]
             """
-            # [class_name, [xmin, ymin, xmax, ymax]]
+            # [class_name, xmin, ymin, xmax, ymax]
             re = parse_bbox_xml(xml_path, self._class_dict)
+            n_bbox = min(len(re), self._max_bbox)
+            self.true_boxes[self._sample_in_batch][:n_bbox] = re[:n_bbox, 1:]
             return re
 
         self.image_shape_dict = {}
@@ -65,6 +69,7 @@ class VOC(DataFlow):
         super(VOC, self).__init__(
             data_name_list=['.jpg', '.xml', '.jpg'],
             data_dir=[image_dir, xml_dir, image_dir],
+            max_bbox_per_image=max_bbox_per_image,
             shuffle=shuffle,
             batch_dict_name=batch_dict_name,
             load_fnc_list=[read_image, read_xml, read_shape],

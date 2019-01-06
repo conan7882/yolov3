@@ -88,6 +88,7 @@ def train():
         n_class=config.n_class, 
         anchors=config.anchors,
         bsize=config.train_bsize, 
+        ignore_thr=config.ignore_thr,
         # obj_score_thr=config.obj_score_thr, 
         # nms_iou_thr=config.nms_iou_thr,
         feature_extractor_trainable=False, 

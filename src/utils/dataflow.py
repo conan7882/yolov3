@@ -69,22 +69,29 @@ def parse_bbox_xml(xml_path, class_dict=None, pf=(identity,())):
         except TypeError:
             # box_list.append((name, box))
             box_list.append([name,] + box)
-    return box_list
+    try:
+        return np.array(box_list)
+    except ValueError:
+        return box_list
 
 def get_class_dict_from_xml(xml_path):
     file_list = get_file_list(xml_path, 'xml')
     class_dict = {}
     reverse_class_dict = {}
     nclass = 0
+    max_bbox = 0
     for xml_file in file_list:
         bbox_list = parse_bbox_xml(xml_file)
+        cnt_bbox = 0
         for bbox in bbox_list:
+            cnt_bbox += 1
             cur_name = bbox[0]
             if cur_name not in class_dict:
                 class_dict[cur_name] = nclass
                 reverse_class_dict[nclass] = cur_name
                 nclass += 1
-
+        max_bbox = max(max_bbox, cnt_bbox)
+    print('Max number of bbox per image: {}'.format(max_bbox))
     return class_dict, reverse_class_dict
 
 def get_voc_bbox(xml_path):

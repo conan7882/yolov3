@@ -18,9 +18,9 @@ def objectness_loss(label, logits, ignore_mask, name='obj_loss'):
         # neg_obj_mask = tf.logical_and(1 - obj_mask)
         # [bsize, len, 1]
         obj_loss = tf.nn.weighted_cross_entropy_with_logits(
-            targets=label, logits=logits, pos_weight=10, name='obj_loss')
+            targets=label, logits=logits, pos_weight=1., name='obj_loss')
         # ignore the objectness loss with sign == 1
-        masked_obj_loss = apply_mask(obj_loss, ignore_mask, val=0)
+        masked_obj_loss = apply_mask(obj_loss, ignore_mask, val=1)
         return tf.reduce_sum(masked_obj_loss) # [n_non_ignore]
 
 def bboxes_loss(label, pred_t_coord, obj_mask, name='bboxes_loss'):

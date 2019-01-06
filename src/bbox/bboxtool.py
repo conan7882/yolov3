@@ -132,58 +132,30 @@ def bbox_list_IOU(bbox_list_1, bbox_list_2, align=True):
     elif len(bbox_list_2.shape) > 2:
         raise ValueError('Incorrect shape of bbox_list_2')
 
-    transpose_sign = False
-    if len(bbox_list_2) < len(bbox_list_1):
-        bbox_list_1, bbox_list_2 = bbox_list_2, bbox_list_1
-        transpose_sign = True
+    h_1, w_1 = bbox_list_1[..., 3] - bbox_list_1[..., 1],\
+               bbox_list_1[..., 2] - bbox_list_1[..., 0]
+    h_2, w_2 = bbox_list_2[..., 3] - bbox_list_2[..., 1],\
+               bbox_list_2[..., 2] - bbox_list_2[..., 0]
+    area_1 = np.expand_dims(h_1 * w_1, axis=1)
+    area_2 = h_2 * w_2
 
     if align:
-        h_list = bbox_list_2[:, 3] - bbox_list_2[:, 1]
-        w_list = bbox_list_2[:, 2] - bbox_list_2[:, 0]
-        area_list = np.multiply(h_list, w_list)
-
-        iou_list = []
-        for bbox in bbox_list_1:
-            h = bbox[3] - bbox[1]
-            w = bbox[2] - bbox[0]
-            area = h * w
-
-            inter_h = np.minimum(h, h_list)
-            inter_w = np.minimum(w, w_list)
-            inter_area = np.multiply(inter_h, inter_w)
-            iou = inter_area / (area_list + area - inter_area)
-            iou_list.append(iou)        
+        inter_h = np.minimum(np.expand_dims(h_1, axis=1), h_2)
+        inter_w = np.minimum(np.expand_dims(w_1, axis=1), w_2)
+   
     else:
-        iou_list = []
-        for bbox in bbox_list_1:
-            h = bbox[3] - bbox[1]
-            w = bbox[2] - bbox[0]
-            area = h * w
-
-            h_list = bbox_list_2[:, 3] - bbox_list_2[:, 1]
-            w_list = bbox_list_2[:, 2] - bbox_list_2[:, 0]
-            area_list = h_list * w_list
-
-            inter_min = np.maximum(bbox[:2], bbox_list_2[:, :2])
-            inter_max = np.minimum(bbox[2:], bbox_list_2[:, 2:])
-            
-            inter_w = inter_max[:, 0] - inter_min[:, 0]
-            inter_h = inter_max[:, 1] - inter_min[:, 1]
-
-            inter_area = inter_w * inter_h
-            # print(np.where(inter_w < 0) or np.where(inter_h < 0))
-            # print(np.any([inter_w < 0, inter_h < 0], axis=0))
-            # print(np.where(inter_h < 0))
-            inter_area[np.any([inter_w < 0, inter_h < 0], axis=0)] = 0
-            # print(area_list,area,inter_area)
-            iou = inter_area / (area_list + area - inter_area)
-            iou_list.append(iou) 
-
+        inter_min = np.maximum(np.expand_dims(bbox_list_1[..., :2], axis=1),
+                               bbox_list_2[..., :2])
+        inter_max = np.minimum(np.expand_dims(bbox_list_1[..., 2:], axis=1),
+                               bbox_list_2[..., 2:])
+        inter_w = inter_max[..., 0] - inter_min[..., 0]
+        inter_h = inter_max[..., 1] - inter_min[..., 1]
+    inter_area = inter_w * inter_h
+    inter_area[np.any([inter_w < 0, inter_h < 0], axis=0)] = 0
+    iou_list = inter_area / (area_1 + area_2 - inter_area)  
     iou_list = np.array(iou_list)
-    if transpose_sign:
-        return iou_list.transpose()
-    else:
-        return iou_list
+
+    return iou_list
 
 # def bbox_ele_IoU(bbox_list_1, bbox_list_2):
 #     # box [xmin, ymin, xmax, ymax]
