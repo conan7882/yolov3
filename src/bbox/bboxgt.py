@@ -61,7 +61,12 @@ class TargetAnchor(object):
             # print(rescale_shape)
             self.init_anchors_dict[rescale_shape[0]] = {'index': ind_list, 'anchors': anchor_list, 'sub2ind': sub2ind_dict}
 
-    def get_yolo_target_anchor(self, gt_bbox_batch, im_shape_batch, rescale_shape, is_flatten=False):
+    def get_yolo_target_anchor(self,
+                               gt_bbox_batch, 
+                               true_bbox_batch,
+                               im_shape_batch, 
+                               rescale_shape, 
+                               is_flatten=False):
         # gt_bbox_batch [bsize, n_gt, 4] xyxy
         # im_shape_batch [bsize, 2]
         if isinstance(rescale_shape, int):
@@ -95,7 +100,7 @@ class TargetAnchor(object):
                 for anchor_idx in anchor_idx_list:
                     candidate_anchor.append(anchor_list[anchor_idx])
 
-                iou_mat = bboxtool.bbox_list_IOU([gt_bbox], candidate_anchor, align=False)
+                iou_mat = bboxtool.bbox_list_IOU([gt_bbox], candidate_anchor, align=True)
                 ignore_idx_list = np.where(iou_mat >= self._ignore_thr)[1]
                 for ignore_idx in ignore_idx_list:
                     anchor_idx = anchor_idx_list[ignore_idx]
@@ -122,7 +127,7 @@ class TargetAnchor(object):
         if is_flatten:
             batch_gt_mask = self._flatten_gt_mask(batch_gt_mask)
 
-        return np.array(batch_gt_mask)#, target_anchor_batch
+        return np.array(batch_gt_mask), bboxtool.rescale_bbox(true_bbox_batch, im_shape, rescale_shape)#, target_anchor_batch
 
     def _flatten_gt_mask(self, gt_mask_batch):
         flatten_gt_mask_batch = []

@@ -112,10 +112,10 @@ def rescale_bbox(bbox_list, from_shape, to_shape):
     from_shape = utils.get_shape2D(from_shape)
     to_shape = utils.get_shape2D(to_shape)
     rescale_bbox = np.stack(
-        [bbox_list[:, 0] / from_shape[1] * to_shape[1],
-         bbox_list[:, 1] / from_shape[0] * to_shape[0],
-         bbox_list[:, 2] / from_shape[1] * to_shape[1],
-         bbox_list[:, 3] / from_shape[0] * to_shape[0]], axis=-1)
+        [bbox_list[..., 0] / from_shape[1] * to_shape[1],
+         bbox_list[..., 1] / from_shape[0] * to_shape[0],
+         bbox_list[..., 2] / from_shape[1] * to_shape[1],
+         bbox_list[..., 3] / from_shape[0] * to_shape[0]], axis=-1)
     return rescale_bbox
 
 def bbox_list_IOU(bbox_list_1, bbox_list_2, align=True):

@@ -38,6 +38,8 @@ class ConfigParser(object):
         self.n_class = self._get_value(self.netconfig, 'n_class')
         self.anchors = self._get_value(self.netconfig, 'anchors')
         self.ignore_thr = self._get_value(self.netconfig, 'ignore_thr')
+        self.obj_weight = self._get_value(self.netconfig, 'obj_weight')
+        self.nobj_weight = self._get_value(self.netconfig, 'nobj_weight')
 
     def _get_scalar_value(self, parser, val_type, section, name):
         try:
@@ -67,32 +69,22 @@ class ConfigParser(object):
         for section in cfg_parser.sections():
             if section.startswith('net'):
                 cfg_dict['test_bsize'] = self._get_scalar_value(cfg_parser, int, section, 'test_batch')
-                # int(cfg_parser[section]['test_batch'])
                 cfg_dict['train_bsize'] = self._get_scalar_value(cfg_parser, int, section, 'train_batch')
-                # int(cfg_parser[section]['train_batch'])
                 cfg_dict['rescale'] = [self._get_scalar_value(cfg_parser, int, section, 'width'),
                                        self._get_scalar_value(cfg_parser, int, section, 'height')]
-                # [int(cfg_parser[section]['width']),
-                                       # int(cfg_parser[section]['height'])]
                 cfg_dict['n_channel'] = self._get_scalar_value(cfg_parser, int, section, 'channel')
-                # int(cfg_parser[section]['channel'])
                 cfg_dict['multiscale'] = self._get_list(cfg_parser, int, section, 'multiscale')
-                # list(map(int, (cfg_parser[section]['multiscale']).split(',')))
 
             if section.startswith('yolo'):
                 cfg_dict['obj_score_thr'] = self._get_scalar_value(cfg_parser, float, section, 'obj_score_thresh')
-                # float(cfg_parser[section]['obj_score_thresh'])
                 cfg_dict['nms_iou_thr'] = self._get_scalar_value(cfg_parser, float, section, 'nms_iou_thresh')
-                # float(cfg_parser[section]['nms_iou_thresh'])
                 cfg_dict['n_class'] = self._get_scalar_value(cfg_parser, int, section, 'classes')
-                # int(cfg_parser[section]['classes'])
                 cfg_dict['ignore_thr'] = self._get_scalar_value(cfg_parser, float, section, 'ignore_thr')
-                # float(cfg_parser[section]['ignore_thr'])
+                cfg_dict['nobj_weight'] = self._get_scalar_value(cfg_parser, float, section, 'nobj_weight')
+                cfg_dict['obj_weight'] = self._get_scalar_value(cfg_parser, float, section, 'obj_weight')
 
                 anchors = self._get_list(cfg_parser, float, section, 'anchors')
-                # list(map(float, (cfg_parser[section]['anchors']).split(',')))
                 anchor_mask = self._get_list(cfg_parser, int, section, 'anchor_mask')
-                # list(map(int, (cfg_parser[section]['anchor_mask']).split(',')))
 
                 anchor_scale = np.amax(anchor_mask)
                 anchor_list = [[] for _ in range(anchor_scale+1)]

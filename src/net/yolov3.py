@@ -29,7 +29,9 @@ class YOLOv3(BaseModel):
                  bsize=2,
                  ignore_thr=0.5,
                  feature_extractor_trainable=False,
-                 detector_trainable=False):
+                 detector_trainable=False,
+                 obj_weight=1.,
+                 nobj_weight=1.):
         """ 
             Args:
                 n_channel (int): number of channels of input image
@@ -52,6 +54,11 @@ class YOLOv3(BaseModel):
         self._anchors = anchors
         self._stride_list = [32, 16, 8]
         self._ignore_thr = ignore_thr
+
+        # adjust obj and nobj scale
+        self._obj_w = obj_weight
+        self._pos_obj_w = obj_weight * 1 / nobj_weight
+        self._adjust_obj_w = nobj_weight
 
         # load pre-trained model
         self._pretrained_dict = None
@@ -194,16 +201,27 @@ class YOLOv3(BaseModel):
             bbox_label, objectness_label, ignore_mask, classes_label = tf.split(
                 self.label, [4, 1, 1, self._n_class], axis=-1, name='split_label')
 
-            ignore_mask = self._get_ignore_mask(
-                self.layers['pred_bbox'], self.true_boxes, objectness_label)
-            obj_loss = losses.objectness_loss(
-                objectness_label, self.layers['objectness_logits'], ignore_mask)
-            cls_loss = losses.class_loss(
-                classes_label, self.layers['classes_logits'], objectness_label)
-            bbox_loss = losses.bboxes_loss(
-                bbox_label, self.layers['bbox_t_coord'], objectness_label)
+            ignore_mask = self._get_ignore_mask(self.layers['pred_bbox'],
+                                                self.true_boxes,
+                                                objectness_label)
+
+            obj_loss = losses.objectness_loss(objectness_label,
+                                              self.layers['objectness_logits'],
+                                              ignore_mask,
+                                              self._pos_obj_w)
+
+            cls_loss = losses.class_loss(classes_label,
+                                         self.layers['classes_logits'],
+                                         objectness_label)
+
+            bbox_loss = losses.bboxes_loss(bbox_label,
+                                           self.layers['bbox_t_coord'],
+                                           objectness_label)
             
-            loss = (1. * cls_loss + 1. * bbox_loss + obj_loss) / bsize
+            loss = (self._obj_w * cls_loss\
+                    + self._obj_w * bbox_loss\
+                    + self._adjust_obj_w * obj_loss) / bsize
+            
             self.cls_loss = cls_loss / bsize
             self.bbox_loss = bbox_loss / bsize
             self.obj_loss = obj_loss / bsize
@@ -247,15 +265,15 @@ class YOLOv3(BaseModel):
             self.global_step += 1
             # get one batch data
             batch_data = train_data.next_batch_dict()
-            batch_gt = target_anchor.get_yolo_target_anchor(
-                batch_data['label'], batch_data['shape'], im_rescale, True)
+            batch_gt, true_boxes = target_anchor.get_yolo_target_anchor(
+                batch_data['label'], batch_data['boxes'], batch_data['shape'], im_rescale, True)
 
             _, loss, cls_loss, bbox_loss, obj_loss = sess.run(
                 [self.train_op, self.loss_op, self.cls_loss,
                  self.bbox_loss, self.obj_loss],
                 feed_dict={self.image: batch_data['image'],
                            self.o_shape: batch_data['shape'],
-                           self.true_boxes: batch_data['boxes'],
+                           self.true_boxes: true_boxes,
                            self.label: batch_gt,
                            self.lr: lr})
 

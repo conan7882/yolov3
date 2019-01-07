@@ -11,15 +11,15 @@ def apply_mask(input_matrix, mask, val=1, name='apply_mask'):
         mask = tf.cast(mask, tf.int32)
         return tf.dynamic_partition(input_matrix, mask, 2)[val]
 
-def objectness_loss(label, logits, ignore_mask, name='obj_loss'):
+def objectness_loss(label, logits, ignore_mask, pos_weight, name='obj_loss'):
     with tf.name_scope(name):
         # obj_mask = tf.cast(mask, tf.int32)
         # pos_obj_mask = obj_mask
         # neg_obj_mask = tf.logical_and(1 - obj_mask)
         # [bsize, len, 1]
         obj_loss = tf.nn.weighted_cross_entropy_with_logits(
-            targets=label, logits=logits, pos_weight=1., name='obj_loss')
-        # ignore the objectness loss with sign == 1
+            targets=label, logits=logits, pos_weight=pos_weight, name='obj_loss')
+        # ignore the objectness loss with sign == 0
         masked_obj_loss = apply_mask(obj_loss, ignore_mask, val=1)
         return tf.reduce_sum(masked_obj_loss) # [n_non_ignore]
 
