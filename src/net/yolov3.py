@@ -17,6 +17,7 @@ import src.model.darknet_module as darknet_module
 import src.model.detection_bbox as detection_bbox
 import src.bbox.tfbboxtool as tfbboxtool
 
+
 INIT_W = tf.keras.initializers.he_normal()
 
 class YOLOv3(BaseModel):
@@ -69,11 +70,11 @@ class YOLOv3(BaseModel):
         self.layers = {}
 
     def _create_train_input(self):
-        self.o_shape = tf.placeholder(tf.float32, [None, 2], 'o_shape')
+        # self.o_shape = tf.placeholder(tf.float32, [None, 2], 'o_shape')
         self.image = tf.placeholder(
             tf.float32, [None, None, None, self._n_channel], name='image')
         self.label = tf.placeholder(
-            tf.float32, [None, None, (1 + 4 + 1 + self._n_class)], 'label')
+            tf.float32, [None, None, (1 + 4 + self._n_class)], 'label')
         # xyxy
         self.true_boxes = tf.placeholder(
             tf.float32, [None, None, 4], 'true_boxes')
@@ -196,10 +197,10 @@ class YOLOv3(BaseModel):
 
     def _get_loss(self):
         with tf.name_scope('loss'):
-            bsize = tf.cast(tf.shape(self.o_shape)[0], tf.float32)
+            bsize = tf.cast(tf.shape(self.true_boxes)[0], tf.float32)
 
-            bbox_label, objectness_label, ignore_mask, classes_label = tf.split(
-                self.label, [4, 1, 1, self._n_class], axis=-1, name='split_label')
+            bbox_label, objectness_label, classes_label = tf.split(
+                self.label, [4, 1, self._n_class], axis=-1, name='split_label')
 
             ignore_mask = self._get_ignore_mask(self.layers['pred_bbox'],
                                                 self.true_boxes,
@@ -233,7 +234,7 @@ class YOLOv3(BaseModel):
     def train_epoch(self,
                     sess, 
                     train_data, 
-                    target_anchor, 
+                    pre_processor, 
                     init_lr, 
                     im_rescale,
                     summary_writer=None):
@@ -242,9 +243,9 @@ class YOLOv3(BaseModel):
             Args:
                 sess (tf.Session())
                 train_data (Dataflow): dataflow for training set
-                target_anchor (TargetAnchor): object for computing target prediction
+                pre_processor (PreProcess): object for computing target prediction and data augmentation
                 init_lr (float): learning rate
-                im_rescale (int or list of two int): image size of model input
+                im_rescale (list of 2): image size of model input
                 summary_writer (tf.summary)
         """
 
@@ -264,17 +265,23 @@ class YOLOv3(BaseModel):
             step += 1
             self.global_step += 1
             # get one batch data
-            batch_data = train_data.next_batch_dict()
-            batch_gt, true_boxes = target_anchor.get_yolo_target_anchor(
-                batch_data['label'], batch_data['boxes'], batch_data['shape'], im_rescale, True)
+            # batch_data = train_data.next_batch_dict()
+
+            im_batch, gt_mask_batch, true_boxes = pre_processor.process_batch(output_scale=im_rescale)
+
+            # batch_gt, true_boxes = target_anchor.get_yolo_target_anchor(
+            #     batch_data['label'], 
+            #     batch_data['boxes'], 
+            #     batch_data['shape'], 
+            #     im_rescale, True)
 
             _, loss, cls_loss, bbox_loss, obj_loss = sess.run(
                 [self.train_op, self.loss_op, self.cls_loss,
                  self.bbox_loss, self.obj_loss],
-                feed_dict={self.image: batch_data['image'],
-                           self.o_shape: batch_data['shape'],
+                feed_dict={self.image: im_batch,
+                           # self.o_shape: batch_data['shape'],
                            self.true_boxes: true_boxes,
-                           self.label: batch_gt,
+                           self.label: gt_mask_batch,
                            self.lr: lr})
 
             cls_loss_sum += cls_loss
@@ -335,18 +342,28 @@ class YOLOv3(BaseModel):
             bbox_score, bbox_para = sess.run(
                 [self.layers['bbox_score'], self.layers['bbox']],
                 feed_dict={self.image: batch_data['image']})
+
             for idx, (score, para) in enumerate(zip(bbox_score, bbox_para)):
-                
                 nms_boxes, nms_scores, nms_label_names, nms_label_ids =\
                     detection_bbox.detection(
-                        para, score, n_class=self._n_class, obj_score_thr=obj_score_thr,
-                        nms_iou_thr=nms_iou_thr, label_dict=label_dict,
-                        image_shape=batch_data['shape'][idx], rescale_shape=im_rescale)
+                        para,
+                        score, 
+                        n_class=self._n_class, 
+                        obj_score_thr=obj_score_thr,
+                        nms_iou_thr=nms_iou_thr, 
+                        label_dict=label_dict,
+                        image_shape=batch_data['shape'][idx], 
+                        rescale_shape=im_rescale)
+
                 original_im = imagetool.rescale_image(
                     batch_data['image'][idx] * 255, batch_data['shape'][idx])
+
                 viz.draw_bounding_box_on_image_array(
-                    original_im, bbox_list=nms_boxes, class_list=nms_label_ids,
-                    score_list=nms_scores, category_index=category_index,
+                    original_im, 
+                    bbox_list=nms_boxes, 
+                    class_list=nms_label_ids,
+                    score_list=nms_scores, 
+                    category_index=category_index,
                     save_name=os.path.join(save_path, 'epoch_{}_im_{}.png'.format(self.epoch_id, im_id)),
                     save_fig=True)
                 im_id += 1

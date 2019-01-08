@@ -11,6 +11,10 @@ from src.utils.dataflow import vec2onehot
 
 class TargetAnchor(object):
     def __init__(self, rescale_shape_list, stride_list, prior_list, n_class, ignore_thr=0.5):
+        # print(np.concatenate((np.zeros((9,2)), np.reshape(prior_list, (-1,2))), axis=-1))
+        anchor_list = np.reshape(prior_list, (-1,2))
+        self._anchor_list = np.concatenate((np.zeros((len(anchor_list), 2)), anchor_list), axis=-1)
+
         self._n_class = n_class
         self._yolo_single_out_dim = 1 + 4 + 1 + n_class # 1: obj 4: bbox 1: obj_ignore
         self._stride_list = stride_list
@@ -81,33 +85,40 @@ class TargetAnchor(object):
         # target_anchor_batch = [[] for _ in range(len(gt_bbox_batch))]
         # b_id = -1
         batch_gt_mask = []
-        for gt_bbox, im_shape in zip(gt_bbox_batch, im_shape_batch):
+        for gt_bboxes, im_shape in zip(gt_bbox_batch, im_shape_batch):
             # print(len(gt_bbox))
             # b_id += 1
             gt_mask = copy.deepcopy(self.init_gt_mask_dict[rescale_shape[0]])
-            gt_bbox_para, gt_bbox_label = self._convert_gt(gt_bbox, im_shape, rescale_shape)
+            gt_bbox_para, gt_bbox_label = self._convert_gt(gt_bboxes, im_shape, rescale_shape)
             one_hot_label = vec2onehot(gt_bbox_label, self._n_class)
             gt_cxy = np.stack(
                 [(gt_bbox_para[:, 0] + gt_bbox_para[:, 2]) / 2,
                  (gt_bbox_para[:, 1] + gt_bbox_para[:, 3]) / 2], axis=-1)
-            for gt_id, gt_bbox in enumerate(gt_bbox_para):
+
+            iou_mat = bboxtool.bbox_list_IOU(
+                gt_bbox_para, bboxtool.cxywh2xyxy(self._anchor_list), align=True)
+            target_anchor_list = np.argmax(iou_mat, axis=-1)
+            # print()
+
+            for gt_id, (target_anchor_idx, gt_bbox) in enumerate(zip(target_anchor_list, gt_bbox_para)):
                 candidate_anchor = []
                 anchor_idx_list = []
                 for scale_id, stride in enumerate(self._stride_list):
                     anchor_feat_cxy = gt_cxy[gt_id] // stride
                     gt_feat_cxy =  gt_cxy[gt_id] / stride
                     anchor_idx_list += sub2ind[(scale_id, anchor_feat_cxy[1], anchor_feat_cxy[0])]
-                for anchor_idx in anchor_idx_list:
-                    candidate_anchor.append(anchor_list[anchor_idx])
+                # for anchor_idx in anchor_idx_list:
+                    # candidate_anchor.append(anchor_list[anchor_idx])
 
-                iou_mat = bboxtool.bbox_list_IOU([gt_bbox], candidate_anchor, align=True)
-                ignore_idx_list = np.where(iou_mat >= self._ignore_thr)[1]
-                for ignore_idx in ignore_idx_list:
-                    anchor_idx = anchor_idx_list[ignore_idx]
-                    scale_id, prior_id, row_id, col_id, _, _ = self._get_anchor_property(anchor_idx, ind_list)
-                    gt_mask[scale_id][prior_id][row_id, col_id, 5] = 1
-
-                target_anchor_idx = np.argmax(iou_mat, axis=-1)[0]
+                # iou_mat = bboxtool.bbox_list_IOU([gt_bbox], candidate_anchor, align=True)
+                # ignore_idx_list = np.where(iou_mat >= self._ignore_thr)[1]
+                # for ignore_idx in ignore_idx_list:
+                #     anchor_idx = anchor_idx_list[ignore_idx]
+                #     scale_id, prior_id, row_id, col_id, _, _ = self._get_anchor_property(anchor_idx, ind_list)
+                #     gt_mask[scale_id][prior_id][row_id, col_id, 5] = 1
+                # print('orignal: {}'.format(iou_mat))
+                # target_anchor_idx = np.argmax(iou_mat, axis=-1)[0]
+                # print('orignal: {}'.format(target_anchor_idx))
                 # target_anchor_batch[b_id].append(candidate_anchor[target_anchor_idx])
                 anchor_idx = anchor_idx_list[target_anchor_idx]
                 scale_id, prior_id, row_id, col_id, anchor_xyxy, anchor_stride =\
@@ -121,7 +132,6 @@ class TargetAnchor(object):
                 # TODO
                 # multi-class
                 gt_mask[scale_id][prior_id][row_id, col_id, 6:] = one_hot_label[gt_id]
-                # print(one_hot_label[gt_id])
             batch_gt_mask.append(gt_mask)
 
         if is_flatten:

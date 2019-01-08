@@ -71,7 +71,7 @@ def load_VOC(batch_size=1, rescale=416):
         category_index[class_id] = {'id': class_id, 'name': class_id_dict[class_id]}
 
     def normalize_im(im, *args):
-        im = imagetool.rescale_image(im, args[0])
+        # im = imagetool.rescale_image(im, args[0])
         im = np.array(im)
         if np.amax(im) > 1:
             im = im / 255.

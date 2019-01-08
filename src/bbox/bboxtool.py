@@ -46,6 +46,14 @@ def xyxy2yolotcoord(xyxy_bbox, anchor, stride, cxy):
 
     return np.concatenate([bcxy, bwh], axis=-1) 
 
+def cxywh2xyxy(bbox_list):
+    xyxy_bbox = np.stack(
+        [bbox_list[..., 0] - bbox_list[..., 2] / 2,
+         bbox_list[..., 1] - bbox_list[..., 3] / 2,
+         bbox_list[..., 0] + bbox_list[..., 2] / 2,
+         bbox_list[..., 1] + bbox_list[..., 3] / 2,], axis=-1)
+    return xyxy_bbox
+
 def xyxy2cxywh(bbox_list):
     cxywh_bbox = np.stack(
         [(bbox_list[:, 0] + bbox_list[:, 2]) / 2,
@@ -157,6 +165,32 @@ def bbox_list_IOU(bbox_list_1, bbox_list_2, align=True):
 
     return iou_list
 
+def affine_transform_bbox(bboxes, T, from_shape, to_shape):
+    # bboxes [n, 4] xyxy
+    # T [3,3]
+    # from_shape, to_shape [h, w]
+
+    bboxes[...,[0, 2]] = 2. * bboxes[...,[0, 2]] / from_shape[1] - 1
+    bboxes[...,[1, 3]] = 2. * bboxes[...,[1, 3]] / from_shape[0] - 1
+
+    bbox_nodes = np.stack([np.stack([bboxes[..., 0], bboxes[..., 1], np.ones(len(bboxes))], axis=-1),
+                           np.stack([bboxes[..., 2], bboxes[..., 3], np.ones(len(bboxes))], axis=-1),
+                           np.stack([bboxes[..., 2], bboxes[..., 1], np.ones(len(bboxes))], axis=-1),
+                           np.stack([bboxes[..., 0], bboxes[..., 3], np.ones(len(bboxes))], axis=-1),], axis=-1)
+
+    rotate_box = np.matmul(T, bbox_nodes)
+    rotate_x = rotate_box[...,0,:]
+    rotate_y = rotate_box[...,1,:]
+
+    bboxes = np.stack([np.amin(rotate_x, axis=-1),
+                       np.amin(rotate_y, axis=-1),
+                       np.amax(rotate_x, axis=-1),
+                       np.amax(rotate_y, axis=-1)], axis=-1)
+    bboxes[...,[0, 2]] = (bboxes[...,[0, 2]] + 1) / 2. * to_shape[1]
+    bboxes[...,[1, 3]] = (bboxes[...,[1, 3]] + 1) / 2. * to_shape[0]
+
+    return bboxes
+
 # def bbox_ele_IoU(bbox_list_1, bbox_list_2):
 #     # box [xmin, ymin, xmax, ymax]
 #     bbox_list_1 = np.array(bbox_list_1)
@@ -178,6 +212,7 @@ def bbox_list_IOU(bbox_list_1, bbox_list_2, align=True):
 #     h_1, w_1 = bbox_list_1[3] - bbox_list_1[1], bbox_list_1[2] - bbox_list_1[0]
 #     h_2, w_2 = bbox_list_2[3] - bbox_list_2[1], bbox_list_2[2] - bbox_list_2[0]
 #     area_1, area_2 = h_1 * w_1, h_2 * w_2
+
 
 
 if __name__ == '__main__':

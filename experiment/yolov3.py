@@ -20,6 +20,7 @@ from src.bbox.py_nms import non_max_suppression
 import src.model.detection_bbox as detection_bbox
 import src.utils.image as imagetool
 from src.bbox.bboxgt import TargetAnchor
+from src.dataflow.preprocess import PreProcess
 
 
 # PRETRINED_PATH = '/Users/gq/workspace/Dataset/pretrained/yolov3.npy'
@@ -71,17 +72,30 @@ def train():
 
     config = parscfg.ConfigParser('configs/{}_path.cfg'.format(platform.node()),
                                   'configs/voc.cfg')
-    im_rescale = config.im_rescale
+    train_im_rescale = config.im_rescale
     
     # Training
     train_data, label_dict, category_index = loader.load_VOC(
-        batch_size=config.train_bsize, rescale=im_rescale)
-    target_anchor = TargetAnchor(
-        config.mutliscale,
-        [32, 16, 8], 
-        config.anchors, 
-        config.n_class, 
-        ignore_thr=config.ignore_thr)
+        batch_size=config.train_bsize, rescale=train_im_rescale)
+    # target_anchor = TargetAnchor(
+    #     config.mutliscale,
+    #     [32, 16, 8], 
+    #     config.anchors, 
+    #     config.n_class, 
+    #     ignore_thr=config.ignore_thr)
+
+    pre_processor = PreProcess(
+        dataflow=train_data, 
+        rescale_shape_list=config.mutliscale,
+        stride_list=[32, 16, 8],
+        prior_list=config.anchors, 
+        n_class=config.n_class,
+        h_flip=True, 
+        crop=True, 
+        color=True, 
+        affine=True,
+        im_intensity=1.,
+        max_num_bbox_per_im=45)
 
     train_model = YOLOv3(
         n_channel=config.n_channel,
@@ -126,10 +140,10 @@ def train():
     with tf.Session(config=sessconfig) as sess:
         sess.run(tf.global_variables_initializer())
 
-        for i in range(150):
-            if i >= 100:
+        for i in range(150*3):
+            if i >= 100*3:
                 lr = FLAGS.lr / 100.
-            elif i >= 50:
+            elif i >= 50*2:
                 lr = FLAGS.lr / 10.
             else:
                 lr = FLAGS.lr
@@ -148,16 +162,16 @@ def train():
             train_model.train_epoch(
                 sess, 
                 train_data, 
-                target_anchor, 
+                pre_processor, 
                 lr, 
-                im_rescale,
+                train_im_rescale,
                 summary_writer=writer)
 
-            if i > 0 and i % 10 == 0:
+            if i > 0 and i % 20 == 0:
                 pick_id = np.random.choice(len(config.mutliscale))
-                im_rescale = config.mutliscale[pick_id]
-                train_data.reset_image_rescale(rescale=im_rescale)
-                print('rescale to {}'.format(im_rescale))
+                train_im_rescale = config.mutliscale[pick_id]
+                train_im_rescale = [train_im_rescale, train_im_rescale]
+                print('rescale to {}'.format(train_im_rescale))
 
 def detect():
     # pathconfig = parscfg.parse_cfg('configs/{}_path.cfg'.format(platform.node()))
