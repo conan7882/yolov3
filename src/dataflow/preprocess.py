@@ -118,10 +118,9 @@ class PreProcess(object):
             self._output_scale = scale
 
     def tf_process_batch(self, batch_im, batch_labels):
+        output_scale = self._output_scale
 
         def _process_batch(batch_im, batch_labels):
-            output_scale = self._output_scale
-
             true_boxes = np.zeros([len(batch_im), self._max_bbox, 4])
             gt_mask_batch = []
             im_batch = []
@@ -139,14 +138,20 @@ class PreProcess(object):
                 gt_mask_batch.append(gt_mask)
 
             gt_mask_batch = self._flatten_gt_mask(gt_mask_batch)
-            return np.array(im_batch), np.array(gt_mask_batch), true_boxes
+            return np.array(im_batch).astype(np.float32),\
+                   np.array(gt_mask_batch).astype(np.float32),\
+                   true_boxes.astype(np.float32)
 
         im_b, gt_mask_b, boxes_b = tf.py_func(
             _process_batch,
             [batch_im, batch_labels],
-            [tf.float64, tf.float64, tf.float64],
+            [tf.float32, tf.float32, tf.float32],
             name="map_fnc")
-        return im_b[0], gt_mask_b[0], boxes_b[0]
+
+        im = tf.reshape(im_b[0], (output_scale[0], output_scale[1], batch_im.shape[-1]))
+        gt_mask = tf.reshape(gt_mask_b[0], (-1, self._yolo_single_out_dim))
+        bboxes = tf.reshape(boxes_b[0], (self._max_bbox, 4))
+        return im, gt_mask, bboxes
 
 
     # def process_batch_2(self, output_scale):

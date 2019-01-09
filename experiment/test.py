@@ -193,6 +193,7 @@ def test_input():
     stride_list = [32, 16, 8]
     gen = generator.Generator(
         dataflow=image_data, 
+        n_channle=3,
         rescale_shape_list=[416, 320], 
         stride_list=stride_list, 
         prior_list=config.anchors, 

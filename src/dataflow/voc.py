@@ -19,7 +19,6 @@ class VOC(DetectionDataFlow):
                  class_dict,
                  image_dir='',
                  xml_dir='',
-                 max_bbox_per_image=50,
                  n_channel=3,
                  shuffle=True,
                  batch_dict_name=None,
@@ -70,7 +69,6 @@ class VOC(DetectionDataFlow):
         super(VOC, self).__init__(
             data_name_list=['.jpg', '.xml', '.jpg'],
             data_dir=[image_dir, xml_dir, image_dir],
-            max_bbox_per_image=max_bbox_per_image,
             shuffle=shuffle,
             batch_dict_name=batch_dict_name,
             load_fnc_list=[read_image, read_xml, read_shape],

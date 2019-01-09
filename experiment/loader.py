@@ -14,6 +14,7 @@ from src.dataflow.images import Image
 from src.dataflow.voc import VOC
 from src.utils.dataflow import get_class_dict_from_xml
 import src.utils.image as imagetool
+import src.dataflow.generator as generator
 
 
 def load_coco80_label_yolo():
@@ -53,7 +54,16 @@ def load_imagenet1k_label_darknet():
             label_dict[idx] = imagenet_label_dict[line.rstrip('\n')]
     return label_dict
 
-def load_VOC(batch_size=1, rescale=416):
+def load_VOC(rescale_shape_list,
+             net_stride_list, 
+             prior_anchor_list, 
+             n_class=None, 
+             max_num_bbox_per_im=45,
+             batch_size=1, 
+             buffer_size=4,
+             num_parallel_preprocess=8,
+             h_flip=True, crop=True, color=True, affine=True):
+
     if platform.node() == 'arostitan':
         im_dir = '/home/qge2/workspace/data/dataset/VOCdevkit/VOC2007/JPEGImages/'
         xml_dir = '/home/qge2/workspace/data/dataset/VOCdevkit/VOC2007/Annotations/'
@@ -81,15 +91,31 @@ def load_VOC(batch_size=1, rescale=416):
         class_dict=class_name_dict,
         image_dir=im_dir,
         xml_dir=xml_dir,
-        max_bbox_per_image=50,
         n_channel=3,
         shuffle=True,
-        batch_dict_name=['image', 'label', 'shape', 'boxes'],
-        pf_list=(normalize_im, rescale)
+        batch_dict_name=['image', 'label', 'shape'],
+        pf_list=(normalize_im, ())
         )
-    train_data.setup(epoch_val=0, batch_size=batch_size)
+    train_data.setup(epoch_val=0, batch_size=1)
 
-    return train_data, class_id_dict, category_index
+    if n_class is None:
+        n_class = len(class_name_dict)
+
+    data_generator = generator.Generator(
+        dataflow=train_data, 
+        n_channle=3,
+        rescale_shape_list=rescale_shape_list,
+        stride_list=net_stride_list, 
+        prior_list=prior_anchor_list, 
+        n_class=n_class,
+        batch_size=batch_size, 
+        buffer_size=buffer_size, 
+        num_parallel_preprocess=num_parallel_preprocess,
+        h_flip=h_flip, crop=crop, color=color, affine=affine, im_intensity = 1.,
+        max_num_bbox_per_im=max_num_bbox_per_im)
+    data_generator.reset_im_scale(scale=416)
+
+    return class_id_dict, category_index, data_generator
 
 def read_image(im_name, n_channel, data_dir='', batch_size=1, rescale=None):
     """ function for create a Dataflow for reading images from a folder
@@ -156,32 +182,3 @@ def read_image(im_name, n_channel, data_dir='', batch_size=1, rescale=None):
     image_data.setup(epoch_val=0, batch_size=batch_size)
 
     return image_data
-
-if __name__ == '__main__':
-    import matplotlib.pyplot as plt
-    import src.utils.viz as viz
-
-    xml_dir = '/Users/gq/workspace/Dataset/VOCdevkit/VOC2007/Annotations/'
-    # 
-    # print(class_dict, reverse_class_dict)
-    dataflow, class_dict, category_index = load_VOC(batch_size=2)
-    # print(dataflow._file_name_list)
-
-    batch_date = dataflow.next_batch_dict()
-    print(batch_date['boxes'])
-    # print(batch_date['image'][0].shape)
-
-    # dataflow.reset_image_rescale(rescale=320)
-    # batch_date = dataflow.next_batch_dict()
-    # print(batch_date['label'])
-    # print(batch_date['image'][0].shape)
-
-    # print([[bbox[0] for bbox in bbox_list] for bbox_list in batch_date['label']])
-    # box_list = ([[(bbox[1]) for bbox in bbox_list] for bbox_list in batch_date['label']])
-    # print(box_list)
-    im = imagetool.rescale_image(batch_date['image'][0]*255, batch_date['shape'][0])
-    viz.draw_bounding_box(im, batch_date['boxes'][0])
-    # plt.figure()
-    # plt.imshow(batch_date['image'][0])
-    # plt.show()
-

@@ -148,12 +148,11 @@ class DetectionDataFlow(DataFlow):
     def __init__(self,
                  data_name_list,
                  data_dir='',
-                 max_bbox_per_image=30,
                  shuffle=True,
                  batch_dict_name=None,
                  load_fnc_list=None,):
 
-        self._max_bbox = max_bbox_per_image
+        # self._max_bbox = max_bbox_per_image
         # self._sample_in_batch = 0
 
         super(DetectionDataFlow, self).__init__(

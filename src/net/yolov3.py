@@ -69,35 +69,38 @@ class YOLOv3(BaseModel):
 
         self.layers = {}
 
-    def _create_train_input(self):
-        # self.o_shape = tf.placeholder(tf.float32, [None, 2], 'o_shape')
-        self.image = tf.placeholder(
-            tf.float32, [None, None, None, self._n_channel], name='image')
-        self.label = tf.placeholder(
-            tf.float32, [None, None, (1 + 4 + self._n_class)], 'label')
-        # xyxy
-        self.true_boxes = tf.placeholder(
-            tf.float32, [None, None, 4], 'true_boxes')
+    def _create_train_input(self, input_batch):
+        """ receive and create training data
+
+            Args:
+                input_batch (tensor): Return of tf.data.Iterator.get_next() with length 3.
+                    The order of data should be: image, label (gt_mask), true_boxes
+        """
+        # input_batch: image, label (gt_mask), true_boxes
+        self.image, self.label, self.true_boxes = input_batch
         self.lr = tf.placeholder(tf.float32, name='lr')
 
-    def _create_valid_input(self):
-        self.image = tf.placeholder(
-            tf.float32, [None, None, None, self._n_channel], name='image')
-        self.o_shape = tf.placeholder(tf.float32, [None, 2], 'o_shape')
+    def create_train_model(self, input_batch):
+        """ create model for training
 
-    def create_train_model(self):
+            Args:
+                input_batch (tensor): Return of tf.data.Iterator.get_next() with length 3.
+                    The order of data should be: image, label (gt_mask), true_boxes
+        """
         self.set_is_training(is_training=True)
-        self._create_train_input()
+        self._create_train_input(input_batch)
         _, self.layers['pred_bbox'], self.layers['bbox_t_coord'], self.layers['objectness_logits'], self.layers['classes_logits']\
             = self._create_model(self.image)
-        # self.loss = self._get_loss()
 
         self.train_op = self.get_train_op()
         self.loss_op = self.get_loss()
         self.global_step = 0
         self.epoch_id = 0
 
-        # self.layers['gt_mask'] = self._get_target_anchor(self._rescale_shape)
+    def _create_valid_input(self):
+        self.image = tf.placeholder(
+            tf.float32, [None, None, None, self._n_channel], name='image')
+        self.o_shape = tf.placeholder(tf.float32, [None, 2], 'o_shape')
 
     def create_valid_model(self):
         self.set_is_training(is_training=False)
@@ -106,11 +109,12 @@ class YOLOv3(BaseModel):
             = self._create_model(self.image)
 
         self.epoch_id = 0
-
         # self.layers['det_score'], self.layers['det_bbox'], self.layers['det_class'] =\
         #     self._get_detection(self.layers['bbox_score'], self.layers['bbox'])
 
     def _create_model(self, inputs):
+        """ create the entire net of yolov3 """
+
         with tf.variable_scope('DarkNet53', reuse=tf.AUTO_REUSE):
             feat_out, route_1, route_2 = darknet_module.darkent53_conv(
                 inputs, 
@@ -123,7 +127,6 @@ class YOLOv3(BaseModel):
             darknetFeat_list = [None, route_1, route_2]
 
         with tf.variable_scope('yolo_prediction', reuse=tf.AUTO_REUSE):
-            
             out_dim_list = [1024, 512, 256]
             bbox_score_list = []
             bbox_list = []
@@ -151,7 +154,7 @@ class YOLOv3(BaseModel):
                     bn=True, wd=0, 
                     trainable=self._dete_trainable, 
                     is_training=self.is_training,
-                    scale_id=scale_id+1, 
+                    scale_id=scale_id + 1, 
                     pretrained_dict=self._pretrained_dict, 
                     name='yolo')
 
@@ -160,7 +163,7 @@ class YOLOv3(BaseModel):
                                                 anchors, 
                                                 self._n_class, 
                                                 scale, 
-                                                scale_id+1, 
+                                                scale_id + 1, 
                                                 name='yolo_prediction')
                 
                 bbox_list.append(bbox)
@@ -173,6 +176,7 @@ class YOLOv3(BaseModel):
             bsize = tf.shape(inputs)[0]
 
             def make_tensor_and_batch_flatten(inputs, last_dim):
+                """ reshape from [n_scale, bsize, -1, last_dim] to [bsize, -1, last_dim] """
                 inputs = tf.concat(inputs, axis=1) # [bsize, -1, last_dim] 
                 return tf.reshape(inputs, (bsize, -1, last_dim)) # [bsize, -1, last_dim]
 
@@ -185,9 +189,19 @@ class YOLOv3(BaseModel):
             return bbox_score_list, bbox_list, bbox_t_coord_list, objectness_list, classes_pred_list
 
     def _get_ignore_mask(self, pred_bbox, true_bbox, objectness_label):
-        # pred_bbox cxywh [bsize, n_prediction, 4]
-        # true_bbox xyxy [bsize, max_bbox_per_im, 4]
+        """ compute ignore mask based on the prediction
+            Do not compute loss for non-taget predicted bboxes with IoU greater than a thr.
 
+            Args:
+                pred_bbox (tensor): prediction bbox with shape [bsize, n_prediction, 4]
+                true_bbox (tensor): ground truth bbox with shape [bsize, max_bbox_per_im, 4]
+                objectness_label (tensor): label of target anchors with shape [bsize, n_prediction, 1]
+
+            Returns:
+                ignore mask which masks out non-target bbox with large enough IoU
+                with shape [bsize, n_prediction, 1]
+
+        """
         # [bdize, n_prediction, max_bbox_per_im]
         iou = tfbboxtool.batch_bbox_IoU(pred_bbox, true_bbox)
         best_ious = tf.reduce_max(iou, axis=-1, keepdims=True)
@@ -231,21 +245,12 @@ class YOLOv3(BaseModel):
     def _get_optimizer(self):
         return tf.train.AdamOptimizer(learning_rate=self.lr)
 
-    def train_epoch(self,
-                    sess, 
-                    train_data, 
-                    pre_processor, 
-                    init_lr, 
-                    im_rescale,
-                    summary_writer=None):
+    def train_epoch(self, sess, init_lr, summary_writer=None):
         """ Train the model for one epoch
 
             Args:
                 sess (tf.Session())
-                train_data (Dataflow): dataflow for training set
-                pre_processor (PreProcess): object for computing target prediction and data augmentation
                 init_lr (float): learning rate
-                im_rescale (list of 2): image size of model input
                 summary_writer (tf.summary)
         """
 
@@ -260,46 +265,36 @@ class YOLOv3(BaseModel):
         step = 0
 
         self.epoch_id += 1
-        cur_epoch = train_data.epochs_completed
-        while train_data.epochs_completed == cur_epoch:
-            step += 1
-            self.global_step += 1
-            # get one batch data
-            # batch_data = train_data.next_batch_dict()
+        while True:
+            try:
+                step += 1
+                self.global_step += 1
 
-            im_batch, gt_mask_batch, true_boxes = pre_processor.process_batch(output_scale=im_rescale)
+                _, loss, cls_loss, bbox_loss, obj_loss = sess.run(
+                    [self.train_op, self.loss_op, self.cls_loss,
+                     self.bbox_loss, self.obj_loss],
+                    feed_dict={self.lr: lr})
 
-            # batch_gt, true_boxes = target_anchor.get_yolo_target_anchor(
-            #     batch_data['label'], 
-            #     batch_data['boxes'], 
-            #     batch_data['shape'], 
-            #     im_rescale, True)
+                cls_loss_sum += cls_loss
+                bbox_loss_sum += bbox_loss
+                obj_loss_sum += obj_loss
+                loss_sum += loss
+                
+                if step % 10 == 0:
+                    viz.display(
+                        self.global_step,
+                        step,
+                        [cls_loss_sum, bbox_loss_sum, obj_loss_sum, loss_sum],
+                        display_name_list,
+                        'train',
+                        summary_val=cur_summary,
+                        summary_writer=summary_writer)
 
-            _, loss, cls_loss, bbox_loss, obj_loss = sess.run(
-                [self.train_op, self.loss_op, self.cls_loss,
-                 self.bbox_loss, self.obj_loss],
-                feed_dict={self.image: im_batch,
-                           # self.o_shape: batch_data['shape'],
-                           self.true_boxes: true_boxes,
-                           self.label: gt_mask_batch,
-                           self.lr: lr})
+            except tf.errors.OutOfRangeError:
+                break
 
-            cls_loss_sum += cls_loss
-            bbox_loss_sum += bbox_loss
-            obj_loss_sum += obj_loss
-            loss_sum += loss
-            
-            if step % 10 == 0:
-                viz.display(
-                    self.global_step,
-                    step,
-                    [cls_loss_sum, bbox_loss_sum, obj_loss_sum, loss_sum],
-                    display_name_list,
-                    'train',
-                    summary_val=cur_summary,
-                    summary_writer=summary_writer)
         # write summary 
-        print('==== epoch: {}, lr:{} ===='.format(cur_epoch, lr))
+        print('==== epoch: {}, lr:{} ===='.format(self.epoch_id, lr))
         viz.display(
             self.global_step,
             step,
@@ -378,6 +373,107 @@ class YOLOv3(BaseModel):
             self.epoch_id += 1
         else:
             raise ValueError("Invalid run_type: {}! Has to be 'step' or 'epoch'.".format(run_type))
+
+    # def _create_train_input(self):
+    #     # self.o_shape = tf.placeholder(tf.float32, [None, 2], 'o_shape')
+    #     self.image = tf.placeholder(
+    #         tf.float32, [None, None, None, self._n_channel], name='image')
+    #     self.label = tf.placeholder(
+    #         tf.float32, [None, None, (1 + 4 + self._n_class)], 'label')
+    #     # xyxy
+    #     self.true_boxes = tf.placeholder(
+    #         tf.float32, [None, None, 4], 'true_boxes')
+    #     self.lr = tf.placeholder(tf.float32, name='lr')
+    
+    # def create_train_model(self):
+    #     self.set_is_training(is_training=True)
+    #     self._create_train_input()
+    #     _, self.layers['pred_bbox'], self.layers['bbox_t_coord'], self.layers['objectness_logits'], self.layers['classes_logits']\
+    #         = self._create_model(self.image)
+
+    #     self.train_op = self.get_train_op()
+    #     self.loss_op = self.get_loss()
+    #     self.global_step = 0
+    #     self.epoch_id = 0
+    #     # self.layers['gt_mask'] = self._get_target_anchor(self._rescale_shape)
+
+    # def train_epoch(self,
+    #                 sess, 
+    #                 train_data, 
+    #                 pre_processor, 
+    #                 init_lr, 
+    #                 im_rescale,
+    #                 summary_writer=None):
+    #     """ Train the model for one epoch
+
+    #         Args:
+    #             sess (tf.Session())
+    #             train_data (Dataflow): dataflow for training set
+    #             pre_processor (PreProcess): object for computing target prediction and data augmentation
+    #             init_lr (float): learning rate
+    #             im_rescale (list of 2): image size of model input
+    #             summary_writer (tf.summary)
+    #     """
+
+    #     display_name_list = ['cls_loss', 'bbox_loss', 'obj_loss', 'loss']
+    #     cur_summary = None
+    #     lr = init_lr
+
+    #     cls_loss_sum = 0
+    #     bbox_loss_sum = 0
+    #     obj_loss_sum = 0
+    #     loss_sum = 0
+    #     step = 0
+
+    #     self.epoch_id += 1
+    #     cur_epoch = train_data.epochs_completed
+    #     while train_data.epochs_completed == cur_epoch:
+    #         step += 1
+    #         self.global_step += 1
+    #         # get one batch data
+    #         # batch_data = train_data.next_batch_dict()
+
+    #         im_batch, gt_mask_batch, true_boxes = pre_processor.process_batch(output_scale=im_rescale)
+
+    #         # batch_gt, true_boxes = target_anchor.get_yolo_target_anchor(
+    #         #     batch_data['label'], 
+    #         #     batch_data['boxes'], 
+    #         #     batch_data['shape'], 
+    #         #     im_rescale, True)
+
+    #         _, loss, cls_loss, bbox_loss, obj_loss = sess.run(
+    #             [self.train_op, self.loss_op, self.cls_loss,
+    #              self.bbox_loss, self.obj_loss],
+    #             feed_dict={self.image: im_batch,
+    #                        # self.o_shape: batch_data['shape'],
+    #                        self.true_boxes: true_boxes,
+    #                        self.label: gt_mask_batch,
+    #                        self.lr: lr})
+
+    #         cls_loss_sum += cls_loss
+    #         bbox_loss_sum += bbox_loss
+    #         obj_loss_sum += obj_loss
+    #         loss_sum += loss
+            
+    #         if step % 10 == 0:
+    #             viz.display(
+    #                 self.global_step,
+    #                 step,
+    #                 [cls_loss_sum, bbox_loss_sum, obj_loss_sum, loss_sum],
+    #                 display_name_list,
+    #                 'train',
+    #                 summary_val=cur_summary,
+    #                 summary_writer=summary_writer)
+    #     # write summary 
+    #     print('==== epoch: {}, lr:{} ===='.format(cur_epoch, lr))
+    #     viz.display(
+    #         self.global_step,
+    #         step,
+    #         [cls_loss_sum, bbox_loss_sum, obj_loss_sum, loss_sum],
+    #         display_name_list,
+    #         'train',
+    #         summary_val=cur_summary,
+    #         summary_writer=summary_writer)
 
 
     # def _get_detection(self, bbox_score_list, bbox_para_list):
