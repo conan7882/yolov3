@@ -7,6 +7,7 @@ import os
 import platform
 import numpy as np
 import skimage.transform
+import tensorflow as tf
 
 import sys
 sys.path.append('../')
@@ -150,7 +151,7 @@ def test_image_augment():
 def test_preprocess():
     import time
 
-    image_data, label_dict, _ = loader.load_VOC(batch_size=2)
+    image_data, label_dict, _ = loader.load_VOC(batch_size=32)
     config = parscfg.ConfigParser('configs/{}_path.cfg'.format(platform.node()),
                                   'configs/coco80.cfg')
 
@@ -180,8 +181,50 @@ def test_preprocess():
     # viz.draw_bounding_box(im[0]*255, true_boxes[0], label_list=None, box_type='xyxy')
 
 
+def test_input():
+    import time
+    import src.utils.viz as viz
+    import src.dataflow.generator as generator
+
+    image_data, label_dict, _ = loader.load_VOC(batch_size=1)
+    config = parscfg.ConfigParser('configs/{}_path.cfg'.format(platform.node()),
+                                  'configs/coco80.cfg')
+
+    stride_list = [32, 16, 8]
+    gen = generator.Generator(
+        dataflow=image_data, 
+        rescale_shape_list=[416, 320], 
+        stride_list=stride_list, 
+        prior_list=config.anchors, 
+        n_class=config.n_class,
+        batch_size=32, 
+        buffer_size=2, 
+        num_parallel_preprocess=2,
+        h_flip=True, crop=True, color=True, affine=True, im_intensity = 1.,
+        max_num_bbox_per_im=45)
+
+    print(gen.batch_data)
+
+    with tf.Session() as sess:
+        
+        sess.run(tf.global_variables_initializer())
+
+        for epoch in range(10):
+            print('epoch: {}'.format(epoch))
+            gen.init_iterator(sess)
+            while True:
+                try:
+                    start_time = time.time()
+                    t = sess.run(gen.batch_data)
+                    print(time.time() - start_time)
+                    print(t[0].shape)
+                    print(t[-1].shape)
+                    viz.draw_bounding_box(t[0][5]*255, t[-1][5], label_list=None, box_type='xyxy')
+                except tf.errors.OutOfRangeError:
+                    break
+            pre.set_output_scale(416)
 
 
 if __name__ == "__main__":
-    test_preprocess()
+    test_input()
         

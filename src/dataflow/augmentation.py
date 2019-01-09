@@ -96,7 +96,6 @@ def rescale(image, bboxes, rescale_shape):
     from_shape = image.shape
     to_shape = rescale_shape
 
-    
     bboxes = np.stack(
         [bboxes[..., 0] / from_shape[1] * to_shape[1],
          bboxes[..., 1] / from_shape[0] * to_shape[0],
@@ -122,11 +121,11 @@ def affine_transform(image, bboxes, scale=[1., 1.], translation=[0., 0.], shear=
             rotated image and bboxes
     """
     def _gen_affine_trans():
-        s_x = scale[0]
-        s_y = scale[1]
+        s_x = scale[..., 0]
+        s_y = scale[..., 1]
 
-        t_x = translation[0]
-        t_y = translation[1]
+        t_x = translation[..., 0]
+        t_y = translation[..., 1]
 
         theta = np.pi * angle / 180
         sin = np.sin(theta)
@@ -136,8 +135,8 @@ def affine_transform(image, bboxes, scale=[1., 1.], translation=[0., 0.], shear=
                   [s_x * sin, s_y * cos, t_x * s_x * sin + t_y * s_y * cos,],
                   [0,0,1]]
 
-        shear_x = shear[0]
-        shear_y = shear[1]
+        shear_x = shear[..., 0]
+        shear_y = shear[..., 1]
         shear_matrix = [[1. + shear_x * shear_y,  shear_x, 0.], 
                         [shear_y, 1., 0],
                         [0., 0. , 1.]]
@@ -164,8 +163,7 @@ def change_color(image, hue, saturate, brightness, intensity_scale=255.):
     """
     rgb_im = image * 1. / intensity_scale
     hsv_image = matplotlib.colors.rgb_to_hsv(rgb_im)
-
-    rgb_to_hsv(rgb_im)
+    # hsv_image = rgb_to_hsv(rgb_im)
 
     hsv_image[..., 0] += hue
     hsv_image[..., 0][np.where(hsv_image[..., 0] > 1)] = hsv_image[..., 0][np.where(hsv_image[..., 0] > 1)] - 1
@@ -179,27 +177,30 @@ def change_color(image, hue, saturate, brightness, intensity_scale=255.):
 
 def rgb_to_hsv(im):
     # im (np.array) [..., h, w, 3] rgb range [0, 1]
-
+    o_shape = im.shape
     im = np.reshape(im, (-1, im.shape[-2]*im.shape[-3], 3))
+    bsize = im.shape[0]
+    im_hw = im.shape[1]
+
     r, g, b = np.split(im, 3, axis=-1)
     max_channel_id = np.argmax(im, axis=-1)
-    # 
-
     c_max = np.expand_dims(np.amax(im, axis=-1), axis=-1)
     c_min = np.expand_dims(np.amin(im, axis=-1), axis=-1)
-
     delta = c_max - c_min
-    print(max_channel_id.shape)
-    H = np.stack([60 * ((g-b) / (delta + SMALL_VAL) % 6),
+
+    H_ = np.stack([60 * ((g-b) / (delta + SMALL_VAL) % 6),
                   60 * ((b-r) / (delta + SMALL_VAL) + 2),
                   60 * ((r-g) / (delta + SMALL_VAL) + 4)], axis=-1)
-    print(H.shape)
-    print(H[..., max_channel_id[0][0]].shape)
+
+    b_idx = np.array([i*np.ones((im_hw), dtype=int) for i in range(bsize)])
+    ele_idx = np.array([np.arange(im_hw) for i in range(bsize)])
+    H = H_[b_idx, ele_idx, 0, max_channel_id]
 
     S = delta / (c_max + SMALL_VAL)
-    # print(S.shape)
-
     V = c_max
-    # print(V.shape)
+
+    hsv_image = np.stack([H / 360., np.squeeze(S, axis=-1), np.squeeze(V, axis=-1)], axis=-1)
+    hsv_image = np.reshape(hsv_image, o_shape)
+    return hsv_image
 
 

@@ -85,7 +85,8 @@ def load_VOC(batch_size=1, rescale=416):
         n_channel=3,
         shuffle=True,
         batch_dict_name=['image', 'label', 'shape', 'boxes'],
-        pf_list=(normalize_im, rescale))
+        pf_list=(normalize_im, rescale)
+        )
     train_data.setup(epoch_val=0, batch_size=batch_size)
 
     return train_data, class_id_dict, category_index

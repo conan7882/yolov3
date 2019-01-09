@@ -70,6 +70,9 @@ class DataFlow(object):
         self.rng = get_rng(self)
         self._setup()
 
+    def set_batch_size(self, bsize):
+        self._batch_size = bsize
+
     def _setup(self):
         pass
 
@@ -175,7 +178,7 @@ class DetectionDataFlow(DataFlow):
         
         self._sample_in_batch = 0
         cur_bsize = end - start
-        self.true_boxes = np.zeros([cur_bsize, self._max_bbox, 4])
+        # self.true_boxes = np.zeros([cur_bsize, self._max_bbox, 4])
         batch_data = self._load_data(start, end)
 
         for flow_id in range(len(self._file_name_list)):
@@ -195,7 +198,7 @@ class DetectionDataFlow(DataFlow):
                 data = read_fnc(self._file_name_list[read_idx][k])
                 data_list[read_idx].append(data)
             self._sample_in_batch += 1
-        data_list.append(self.true_boxes)
+        # data_list.append(self.true_boxes)
 
         for idx, data in enumerate(data_list):
             try:

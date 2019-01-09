@@ -39,7 +39,6 @@ class VOC(DetectionDataFlow):
         self._n_channel = n_channel
         self._pf_list = pf_list
 
-
         def read_image(file_name):
             """ read color face image with pre-process function """
             image = load_image(file_name, read_channel=n_channel,  pf=pf_list[0])
@@ -52,8 +51,10 @@ class VOC(DetectionDataFlow):
             """
             # [class_name, xmin, ymin, xmax, ymax]
             re = parse_bbox_xml(xml_path, self._class_dict)
-            n_bbox = min(len(re), self._max_bbox)
-            self.true_boxes[self._sample_in_batch][:n_bbox] = re[:n_bbox, 1:]
+            # print(re)
+            # re = [1,1,1,1,1]
+            # n_bbox = min(len(re), self._max_bbox)
+            # self.true_boxes[self._sample_in_batch][:n_bbox] = re[:n_bbox, 1:]
             return re
 
         self.image_shape_dict = {}
