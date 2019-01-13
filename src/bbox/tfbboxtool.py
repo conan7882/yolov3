@@ -8,6 +8,10 @@ import tensorflow as tf
 def yolotcoord2cxywh():
     pass
 
+def xyxy2yxyx(bbox_list):
+    return tf.stack([bbox_list[..., 1], bbox_list[..., 0],
+                     bbox_list[..., 3], bbox_list[..., 2]], axis=-1)
+
 def cxywh2xyxy(bbox_list):
     xyxy_bbox = tf.stack(
         [bbox_list[..., 0] - bbox_list[..., 2] / 2,

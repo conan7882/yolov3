@@ -20,49 +20,11 @@ import src.dataflow.augmentation as augment
 import src.evaluate.np_eval as np_eval
 import src.bbox.bboxtool as bboxtool
 from src.dataflow.preprocess import PreProcess
+import src.dataflow.operation as dfoper
 
 
 def test_target_anchor():
     import src.utils.viz as viz
-
-
-    # pathconfig = parscfg.parse_cfg('configs/{}_path.cfg'.format(platform.node()))
-    # pretrained_path = pathconfig['coco_pretrained_npy_path']
-    # data_dir = pathconfig['test_image_path']
-    # im_name = pathconfig['test_image_name']
-
-    # netconfig = parscfg.parse_cfg('configs/coco80.cfg')
-    # im_rescale = netconfig['rescale']
-    # n_channel = netconfig['n_channel']
-    # bsize = netconfig['test_bsize']
-    # obj_score_thr = netconfig['obj_score_thr']
-    # nms_iou_thr = netconfig['nms_iou_thr']
-    # n_class = netconfig['n_class']
-    # anchors = netconfig['anchors']
-
-    # image_data, label_dict, _ = loader.load_VOC(batch_size=bsize)
-    # print(label_dict)
-
-    # batch_data = image_data.next_batch_dict()
-
-    # im_shape = batch_data['image'][0].shape[:2]
-    # rescale_shape = 416
-    # stride_list = [32, 16, 8]
-    # # print(batch_data['label'][0])
-    # # gt_anchor, gt_label, gt_dict, gt_mask = bboxgt.get_target_anchor(
-    # #     batch_data['label'][0], batch_data['shape'][0], rescale_shape, stride_list, anchors, n_class)
-
-    # gt_bbox_para = np.array([bbox[1:] for bbox in batch_data['label'][0]])
-    # gt_bbox_label = [bbox[0] for bbox in batch_data['label'][0]]
-
-    # 
-    # # gt = target.get_target_anchor(batch_data['label'], batch_data['shape'], rescale_shape, True)
-    # gt, target_anchor_batch = target.get_yolo_target_anchor(batch_data['label'], batch_data['shape'], rescale_shape, True)
-
-    # rescale_im = image.rescale_image(batch_data['image'][0]*255, rescale_shape)
-    # o_im = image.rescale_image(batch_data['image'][0]*255, batch_data['shape'][0])
-    # viz.draw_bounding_box(o_im, gt_bbox_para, label_list=None, box_type='xyxy')
-    # viz.draw_bounding_box(rescale_im, target_anchor_batch[0], label_list=None, box_type='xyxy')
 
     config = parscfg.ConfigParser('configs/{}_path.cfg'.format(platform.node()),
                                   'configs/coco80.cfg')
@@ -184,27 +146,22 @@ def test_preprocess():
 def test_input():
     import time
     import src.utils.viz as viz
-    import src.dataflow.generator as generator
 
-    image_data, label_dict, _ = loader.load_VOC(batch_size=1)
     config = parscfg.ConfigParser('configs/{}_path.cfg'.format(platform.node()),
                                   'configs/coco80.cfg')
 
-    stride_list = [32, 16, 8]
-    gen = generator.Generator(
-        dataflow=image_data, 
-        n_channle=3,
-        rescale_shape_list=[416, 320], 
-        stride_list=stride_list, 
-        prior_list=config.anchors, 
-        n_class=config.n_class,
-        batch_size=32, 
-        buffer_size=2, 
-        num_parallel_preprocess=2,
-        h_flip=True, crop=True, color=True, affine=True, im_intensity = 1.,
-        max_num_bbox_per_im=45)
+    label_dict, category_index, train_data_generator, valid_data_generator = loader.load_VOC(
+         rescale_shape_list=config.mutliscale,
+         net_stride_list=[32, 16, 8], 
+         prior_anchor_list=config.anchors,
+         n_class=config.n_class,
+         batch_size=1, 
+         buffer_size=4,
+         num_parallel_preprocess=2,
+         h_flip=True, crop=True, color=True, affine=True,
+         max_num_bbox_per_im=45)
 
-    print(gen.batch_data)
+    print(valid_data_generator.batch_data)
 
     with tf.Session() as sess:
         
@@ -212,19 +169,45 @@ def test_input():
 
         for epoch in range(10):
             print('epoch: {}'.format(epoch))
-            gen.init_iterator(sess)
+            train_data_generator.init_iterator(sess)
             while True:
                 try:
                     start_time = time.time()
-                    t = sess.run(gen.batch_data)
+                    t = sess.run(train_data_generator.batch_data)
                     print(time.time() - start_time)
                     print(t[0].shape)
                     print(t[-1].shape)
-                    viz.draw_bounding_box(t[0][5]*255, t[-1][5], label_list=None, box_type='xyxy')
+                    viz.draw_bounding_box(t[0][0]*255, t[-1][0], label_list=None, box_type='xyxy')
                 except tf.errors.OutOfRangeError:
                     break
             pre.set_output_scale(416)
 
+# def test_divide_df():
+#     import src.utils.viz as viz
+
+#     config = parscfg.ConfigParser('configs/{}_path.cfg'.format(platform.node()),
+#                                   'configs/coco80.cfg')
+
+#     label_dict, category_index, train_data_generator = loader.load_VOC(
+#          rescale_shape_list=config.mutliscale,
+#          net_stride_list=[32, 16, 8], 
+#          prior_anchor_list=config.anchors,
+#          n_class=config.n_class,
+#          batch_size=config.train_bsize, 
+#          buffer_size=4,
+#          num_parallel_preprocess=8,
+#          h_flip=True, crop=True, color=True, affine=True,
+#          max_num_bbox_per_im=45)
+
+    # df_list = dfoper.divide_dataflow(train_data, divide_list=[0.2, 0.3, 0.2], shuffle=True)
+    # for df in df_list:
+    #     print(df.size())
+
+
+    # batch_data = df_list[-1].next_batch_dict()
+    # print(batch_data['label'][0][1:])
+    # box_batch = [bbox[1:] for bbox in batch_data['label'][0]]
+    # viz.draw_bounding_box(batch_data['image'][0]*255, box_batch, label_list=None, box_type='xyxy')
 
 if __name__ == "__main__":
     test_input()

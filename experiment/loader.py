@@ -15,6 +15,7 @@ from src.dataflow.voc import VOC
 from src.utils.dataflow import get_class_dict_from_xml
 import src.utils.image as imagetool
 import src.dataflow.generator as generator
+import src.dataflow.operation as dfoper
 
 
 def load_coco80_label_yolo():
@@ -57,12 +58,14 @@ def load_imagenet1k_label_darknet():
 def load_VOC(rescale_shape_list,
              net_stride_list, 
              prior_anchor_list, 
+             train_percentage=0.7,
              n_class=None, 
              max_num_bbox_per_im=45,
              batch_size=1, 
              buffer_size=4,
              num_parallel_preprocess=8,
              h_flip=True, crop=True, color=True, affine=True):
+    assert 0 < train_percentage <= 1.
 
     if platform.node() == 'arostitan':
         im_dir = '/home/qge2/workspace/data/dataset/VOCdevkit/VOC2007/JPEGImages/'
@@ -87,7 +90,7 @@ def load_VOC(rescale_shape_list,
             im = im / 255.
         return np.clip(im, 0., 1.)
 
-    train_data = VOC(
+    voc_data = VOC(
         class_dict=class_name_dict,
         image_dir=im_dir,
         xml_dir=xml_dir,
@@ -96,12 +99,14 @@ def load_VOC(rescale_shape_list,
         batch_dict_name=['image', 'label', 'shape'],
         pf_list=(normalize_im, ())
         )
-    train_data.setup(epoch_val=0, batch_size=1)
+    voc_data.setup(epoch_val=0, batch_size=1)
+
+    train_data, valid_date = dfoper.divide_dataflow(voc_data, divide_list=[train_percentage, 1 - train_percentage], shuffle=True)
 
     if n_class is None:
         n_class = len(class_name_dict)
 
-    data_generator = generator.Generator(
+    train_data_generator = generator.Generator(
         dataflow=train_data, 
         n_channle=3,
         rescale_shape_list=rescale_shape_list,
@@ -113,9 +118,23 @@ def load_VOC(rescale_shape_list,
         num_parallel_preprocess=num_parallel_preprocess,
         h_flip=h_flip, crop=crop, color=color, affine=affine, im_intensity = 1.,
         max_num_bbox_per_im=max_num_bbox_per_im)
-    data_generator.reset_im_scale(scale=416)
+    train_data_generator.reset_im_scale(scale=416)
 
-    return class_id_dict, category_index, data_generator
+    valid_data_generator = generator.Generator(
+        dataflow=valid_date, 
+        n_channle=3,
+        rescale_shape_list=[416],
+        stride_list=net_stride_list, 
+        prior_list=prior_anchor_list, 
+        n_class=n_class,
+        batch_size=batch_size, 
+        buffer_size=buffer_size, 
+        num_parallel_preprocess=num_parallel_preprocess,
+        h_flip=False, crop=False, color=False, affine=False, im_intensity = 1.,
+        max_num_bbox_per_im=max_num_bbox_per_im)
+    valid_data_generator.reset_im_scale(scale=416)
+
+    return class_id_dict, category_index, train_data_generator, valid_data_generator
 
 def read_image(im_name, n_channel, data_dir='', batch_size=1, rescale=None):
     """ function for create a Dataflow for reading images from a folder

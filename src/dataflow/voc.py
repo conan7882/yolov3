@@ -21,12 +21,14 @@ class VOC(DetectionDataFlow):
                  xml_dir='',
                  n_channel=3,
                  shuffle=True,
+                 load_percentage=1.,
                  batch_dict_name=None,
                  pf_list=None):
         """
         Args:
             data_dir (str): directory of data
             shuffle (bool): whether shuffle data or not
+            load_percentage (float): percentage of samples to be used (0, 1]
             batch_dict_name (str): key of face image when getting batch data
             pf_list: pre-process functions for face image
         """
@@ -37,6 +39,9 @@ class VOC(DetectionDataFlow):
         self._nclass = len(class_dict)
         self._n_channel = n_channel
         self._pf_list = pf_list
+
+        assert 0 < load_percentage <= 1., "load_percentage must be in range (0, 1]."
+        self._load_percentage = load_percentage
 
         def read_image(file_name):
             """ read color face image with pre-process function """
@@ -91,6 +96,11 @@ class VOC(DetectionDataFlow):
 
         if self._shuffle:
             self._suffle_file_list()
+
+        n_sample = int(len(self._file_name_list[0]) * self._load_percentage)
+        for idx, file_list in enumerate(self._file_name_list):
+            self._file_name_list[idx] = file_list[:n_sample]
+        print('{} samples in total.'.format(n_sample))
 
     def reset_image_rescale(self, rescale):
 

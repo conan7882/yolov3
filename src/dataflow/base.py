@@ -144,6 +144,17 @@ class DataFlow(object):
     def reset_epochs_completed(self):
         self._epochs_completed = 0
 
+    def get_file_name_list(self):
+        return self._file_name_list
+
+    def reset_file_name_list(self, file_name_list):
+        self._file_name_list = file_name_list
+
+        self._data_id = 0
+        self.reset_epochs_completed()
+
+
+
 class DetectionDataFlow(DataFlow):
     def __init__(self,
                  data_name_list,

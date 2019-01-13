@@ -56,16 +56,16 @@ def cxywh2xyxy(bbox_list):
 
 def xyxy2cxywh(bbox_list):
     cxywh_bbox = np.stack(
-        [(bbox_list[:, 0] + bbox_list[:, 2]) / 2,
-         (bbox_list[:, 1] + bbox_list[:, 3]) / 2,
-         bbox_list[:, 2] - bbox_list[:, 0],
-         bbox_list[:, 3] - bbox_list[:, 1]], axis=-1)
+        [(bbox_list[..., 0] + bbox_list[..., 2]) / 2,
+         (bbox_list[..., 1] + bbox_list[..., 3]) / 2,
+         bbox_list[..., 2] - bbox_list[..., 0],
+         bbox_list[..., 3] - bbox_list[..., 1]], axis=-1)
     return cxywh_bbox
 
 # box [xmin, ymin, xmax, ymax]
 def xyxy2yxyx(bbox_list):
-    return np.stack([bbox_list[:, 1], bbox_list[:, 0],
-                     bbox_list[:, 3], bbox_list[:, 2]], axis=-1)
+    return np.stack([bbox_list[..., 1], bbox_list[..., 0],
+                     bbox_list[..., 3], bbox_list[..., 2]], axis=-1)
 
 # def bbox_area(box):
 #     return (box[2] - box[0] + 1) * (box[3] - box[1] + 1)

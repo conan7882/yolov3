@@ -32,7 +32,8 @@ class YOLOv3(BaseModel):
                  feature_extractor_trainable=False,
                  detector_trainable=False,
                  obj_weight=1.,
-                 nobj_weight=1.):
+                 nobj_weight=1.,
+                 category_index=None):
         """ 
             Args:
                 n_channel (int): number of channels of input image
@@ -67,6 +68,12 @@ class YOLOv3(BaseModel):
             self._pretrained_dict = np.load(
                 pre_trained_path, encoding='latin1').item()
 
+        if category_index is None:
+            category_index = {}
+            for class_id in range(n_class):
+
+                category_index[class_id] = {'id': class_id, 'name': 'unk'}
+        self._category_index = category_index
         self.layers = {}
 
     def _create_train_input(self, input_batch):
@@ -74,10 +81,10 @@ class YOLOv3(BaseModel):
 
             Args:
                 input_batch (tensor): Return of tf.data.Iterator.get_next() with length 3.
-                    The order of data should be: image, label (gt_mask), true_boxes
+                    The order of data should be: image, label (gt_mask), true_boxes, true_classes
         """
-        # input_batch: image, label (gt_mask), true_boxes
-        self.image, self.label, self.true_boxes = input_batch
+        # input_batch: image, label (gt_mask), true_boxes, true_classes
+        self.image, self.label, self.true_boxes, self.true_classes = input_batch
         self.lr = tf.placeholder(tf.float32, name='lr')
 
     def create_train_model(self, input_batch):
@@ -89,22 +96,87 @@ class YOLOv3(BaseModel):
         """
         self.set_is_training(is_training=True)
         self._create_train_input(input_batch)
-        _, self.layers['pred_bbox'], self.layers['bbox_t_coord'], self.layers['objectness_logits'], self.layers['classes_logits']\
+        self.layers['pred_score'], self.layers['pred_bbox'], self.layers['bbox_t_coord'], self.layers['objectness_logits'], self.layers['classes_logits']\
             = self._create_model(self.image)
+
+        self.layers['pred_im'], self.layers['true_im'] = self._get_bbox_on_image_tensor()
 
         self.train_op = self.get_train_op()
         self.loss_op = self.get_loss()
+        self.train_summary_op = self.get_summary('train_images')
         self.global_step = 0
         self.epoch_id = 0
 
-    def _create_valid_input(self):
+    def _get_bbox_on_image_tensor(self):
+        pred_im = viz.tf_draw_bounding_box(
+            im = self.image * 255., 
+            bbox_list=self.layers['pred_bbox'], 
+            score_list=tf.reduce_max(self.layers['pred_score'], axis=-1), 
+            class_list=tf.argmax(self.layers['pred_score'], axis=-1), 
+            category_index=self._category_index,
+            max_boxes_to_draw=20, 
+            min_score_thresh=0.2)
+
+        true_im = viz.tf_draw_bounding_box(
+            im = self.image * 255., 
+            bbox_list=self.true_boxes, 
+            score_list=tf.cast(self.true_classes > 0, tf.int64),
+            class_list=self.true_classes * tf.cast(self.true_classes > 0, tf.float32), 
+            category_index=self._category_index,
+            max_boxes_to_draw=20, 
+            min_score_thresh=0.5)
+
+        return pred_im, true_im
+
+    def get_summary(self, name):
+        with tf.name_scope(name):
+            tf.summary.image(
+                'prediction',
+                self.layers['pred_im'],
+                collections=[name])
+            tf.summary.image(
+                'groundtruth',
+                self.layers['true_im'],
+                collections=[name])
+            return tf.summary.merge_all(key=name)
+
+    def _create_valid_input(self, input_batch):
+        """ receive and create validation data
+
+            Args:
+                input_batch (tensor): Return of tf.data.Iterator.get_next() with length 3.
+                    The order of data should be: image, label (gt_mask), true_boxes, true_classes
+        """
+        # input_batch: image, label (gt_mask), true_boxes, true_classes
+        self.image, self.label, self.true_boxes, self.true_classes = input_batch
+
+    def create_valid_model(self, input_batch):
+        """ create model for validation
+
+            Args:
+                input_batch (tensor): Return of tf.data.Iterator.get_next() with length 3.
+                    The order of data should be: image, label (gt_mask), true_boxes
+        """
+        self.set_is_training(is_training=True)
+        self._create_valid_input(input_batch)
+        self.layers['pred_score'], self.layers['pred_bbox'], self.layers['bbox_t_coord'], self.layers['objectness_logits'], self.layers['classes_logits']\
+            = self._create_model(self.image)
+
+        self.layers['pred_im'], self.layers['true_im'] = self._get_bbox_on_image_tensor()
+
+        self.loss_op = self.get_loss()
+        self.valid_summary_op = self.get_summary('valid_images')
+        self.global_step = 0
+        self.epoch_id = 0
+
+    def _create_test_input(self):
         self.image = tf.placeholder(
             tf.float32, [None, None, None, self._n_channel], name='image')
         self.o_shape = tf.placeholder(tf.float32, [None, 2], 'o_shape')
 
-    def create_valid_model(self):
+    def create_test_model(self):
         self.set_is_training(is_training=False)
-        self._create_valid_input()
+        self._create_test_input()
         self.layers['bbox_score'], self.layers['bbox'], _, _, _\
             = self._create_model(self.image)
 
@@ -165,7 +237,6 @@ class YOLOv3(BaseModel):
                                                 scale, 
                                                 scale_id + 1, 
                                                 name='yolo_prediction')
-                
                 bbox_list.append(bbox)
                 bbox_score_list.append(bbox_score)
                 objectness_list.append(objectness_logits)
@@ -176,7 +247,16 @@ class YOLOv3(BaseModel):
             bsize = tf.shape(inputs)[0]
 
             def make_tensor_and_batch_flatten(inputs, last_dim):
-                """ reshape from [n_scale, bsize, -1, last_dim] to [bsize, -1, last_dim] """
+                """ make list of tensor to be one tensor and batch flatten 
+
+                    Args:
+                        inputs (list of tensor): length of list is n_scale and 
+                            the shape of each tensor is [bsize, -1, last_dim]
+
+                    Returns:
+                        a tensor contains prediction of all scales with shape [bsize, -1, last_dim]
+
+                """
                 inputs = tf.concat(inputs, axis=1) # [bsize, -1, last_dim] 
                 return tf.reshape(inputs, (bsize, -1, last_dim)) # [bsize, -1, last_dim]
 
@@ -269,18 +349,13 @@ class YOLOv3(BaseModel):
             try:
                 step += 1
                 self.global_step += 1
-
-                _, loss, cls_loss, bbox_loss, obj_loss = sess.run(
-                    [self.train_op, self.loss_op, self.cls_loss,
-                     self.bbox_loss, self.obj_loss],
-                    feed_dict={self.lr: lr})
-
-                cls_loss_sum += cls_loss
-                bbox_loss_sum += bbox_loss
-                obj_loss_sum += obj_loss
-                loss_sum += loss
                 
-                if step % 10 == 0:
+                if step % 100 == 0:
+                    _, loss, cls_loss, bbox_loss, obj_loss, cur_summary = sess.run(
+                        [self.train_op, self.loss_op, self.cls_loss,
+                         self.bbox_loss, self.obj_loss, self.train_summary_op],
+                        feed_dict={self.lr: lr})
+
                     viz.display(
                         self.global_step,
                         step,
@@ -289,6 +364,17 @@ class YOLOv3(BaseModel):
                         'train',
                         summary_val=cur_summary,
                         summary_writer=summary_writer)
+
+                else:
+                    _, loss, cls_loss, bbox_loss, obj_loss = sess.run(
+                        [self.train_op, self.loss_op, self.cls_loss,
+                         self.bbox_loss, self.obj_loss],
+                        feed_dict={self.lr: lr})
+
+                cls_loss_sum += cls_loss
+                bbox_loss_sum += bbox_loss
+                obj_loss_sum += obj_loss
+                loss_sum += loss
 
             except tf.errors.OutOfRangeError:
                 break
@@ -301,6 +387,66 @@ class YOLOv3(BaseModel):
             [cls_loss_sum, bbox_loss_sum, obj_loss_sum, loss_sum],
             display_name_list,
             'train',
+            summary_val=None,
+            summary_writer=summary_writer)
+
+    def valid_epoch(self, sess, summary_writer=None):
+        """ Train the model for one epoch
+
+            Args:
+                sess (tf.Session())
+                init_lr (float): learning rate
+                summary_writer (tf.summary)
+        """
+
+        display_name_list = ['cls_loss', 'bbox_loss', 'obj_loss', 'loss']
+        cur_summary = None
+
+        cls_loss_sum = 0
+        bbox_loss_sum = 0
+        obj_loss_sum = 0
+        loss_sum = 0
+        step = 0
+
+        self.epoch_id += 1
+
+        step += 1
+        self.global_step += 1
+        loss, cls_loss, bbox_loss, obj_loss, cur_summary = sess.run(
+            [self.loss_op, self.cls_loss,
+             self.bbox_loss, self.obj_loss,
+             self.valid_summary_op])
+
+        cls_loss_sum += cls_loss
+        bbox_loss_sum += bbox_loss
+        obj_loss_sum += obj_loss
+        loss_sum += loss
+
+        while True:
+            try:
+                step += 1
+                self.global_step += 1
+
+                loss, cls_loss, bbox_loss, obj_loss = sess.run(
+                    [self.loss_op, self.cls_loss,
+                     self.bbox_loss, self.obj_loss])
+
+                cls_loss_sum += cls_loss
+                bbox_loss_sum += bbox_loss
+                obj_loss_sum += obj_loss
+                loss_sum += loss
+                
+            except tf.errors.OutOfRangeError:
+                break
+
+        # write summary 
+        print('[valid]:', end='')
+        viz.display(
+            self.epoch_id,
+            step,
+            [cls_loss_sum, bbox_loss_sum, obj_loss_sum, loss_sum],
+            display_name_list,
+            'valid',
             summary_val=cur_summary,
             summary_writer=summary_writer)
 

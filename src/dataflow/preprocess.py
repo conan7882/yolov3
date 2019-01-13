@@ -34,7 +34,7 @@ class PreProcess(object):
                     start_x = int(np.random.uniform(low=0., high=im_w - new_w))
                     im, bbox = augment.crop(im, bbox, [start_y, start_x, new_h, new_w])
             if color:
-                hue = np.random.uniform(low=-0.4, high=0.4)
+                hue = np.random.uniform(low=-0.2, high=0.2)
                 saturate = np.random.uniform(low=0.9, high=1.1)
                 brightness = np.random.uniform(low=0.5, high=1)
                 im = augment.change_color(im, hue, saturate, brightness, intensity_scale=im_intensity)
@@ -122,6 +122,7 @@ class PreProcess(object):
 
         def _process_batch(batch_im, batch_labels):
             true_boxes = np.zeros([len(batch_im), self._max_bbox, 4])
+            true_classes = -1. * np.ones([len(batch_im), self._max_bbox])
             gt_mask_batch = []
             im_batch = []
             for idx, (im, labels) in enumerate(zip(batch_im, batch_labels)):
@@ -133,6 +134,7 @@ class PreProcess(object):
 
                 im_batch.append(im)
                 true_boxes[idx, :len(bboxes)] = bboxes
+                true_classes[idx, :len(class_labels)] = class_labels
                 
                 gt_mask = self._get_gt_mask(bboxes, class_labels, output_scale)
                 gt_mask_batch.append(gt_mask)
@@ -140,85 +142,20 @@ class PreProcess(object):
             gt_mask_batch = self._flatten_gt_mask(gt_mask_batch)
             return np.array(im_batch).astype(np.float32),\
                    np.array(gt_mask_batch).astype(np.float32),\
-                   true_boxes.astype(np.float32)
+                   true_boxes.astype(np.float32),\
+                   true_classes.astype(np.float32)
 
-        im_b, gt_mask_b, boxes_b = tf.py_func(
+        im_b, gt_mask_b, boxes_b , classes_b = tf.py_func(
             _process_batch,
             [batch_im, batch_labels],
-            [tf.float32, tf.float32, tf.float32],
+            [tf.float32, tf.float32, tf.float32, tf.float32],
             name="map_fnc")
 
         im = tf.reshape(im_b[0], (output_scale[0], output_scale[1], batch_im.shape[-1]))
         gt_mask = tf.reshape(gt_mask_b[0], (-1, self._yolo_single_out_dim))
         bboxes = tf.reshape(boxes_b[0], (self._max_bbox, 4))
-        return im, gt_mask, bboxes
-
-
-    # def process_batch_2(self, output_scale):
-    #     batch_data = self.dataflow.next_batch_dict()
-    #     bsize = len(batch_data['image'])
-    #     true_boxes = np.zeros([bsize, self._max_bbox, 4])
-    #     class_label_list = []
-    #     im_batch = []
-    #     gt_mask_batch = []
-    #     im_intensity = self._im_intensity
-
-    #     if self._h_flip:
-    #         flip_sign = np.random.random(bsize)
-    #     if self._crop:
-    #         crop_sign = np.random.random(bsize)
-    #         new_size_scale = np.random.uniform(low=0.7, high=1., size=[bsize, 2])
-    #         start_crop_scale = np.random.uniform(low=0., high=1., size=[bsize, 2])
-    #     if self._color:
-    #         hue = np.random.uniform(low=-0.4, high=0.4, size=[bsize, 1, 1])
-    #         saturate = np.random.uniform(low=0.9, high=1.1, size=[bsize, 1, 1])
-    #         brightness = np.random.uniform(low=0.5, high=1, size=[bsize, 1, 1])
-    #     if self._affine:
-    #         a_scale = np.random.uniform(low=0.9, high=1.1, size=[bsize, 2])
-    #         a_trans = np.random.uniform(low=-0.3, high=0.3, size=[bsize, 2])
-    #         a_shear = np.random.uniform(low=-0.2, high=0.2, size=[bsize, 2])
-    #         a_angle = np.random.uniform(low=-15, high=15, size=[bsize, 1])
-            
-    #     for idx, (labels, im) in enumerate(zip(batch_data['label'], batch_data['image'])):
-    #         bboxes = np.array([bbox[1:] for bbox in labels])
-    #         class_labels = [int(bbox[0]) for bbox in labels]
-
-    #         im = np.array(im)
-    #         im_h, im_w = im.shape[0], im.shape[1]
-
-    #         if self._crop:
-    #             new_h, new_w = int(im_h * new_size_scale[idx][0]), int(im_w * new_size_scale[idx][1])
-    #             if crop_sign[idx] > 0.5:
-    #                 im, bboxes = augment.center_crop(im, bboxes, [new_h, new_w])
-    #             else:
-    #                 start_y = int(start_crop_scale[idx][0]*(im_h - new_h))
-    #                 start_x = int(start_crop_scale[idx][0]*(im_w - new_w))          
-    #                 im, bboxes = augment.crop(im, bboxes, [start_y, start_x, new_h, new_w])
-    #         if self._affine:
-    #             im, bboxes = augment.affine_transform(
-    #                 im, bboxes, scale=a_scale[idx], translation=a_trans[idx], shear=a_shear[idx], angle=a_angle[idx])
-
-    #         im, bboxes = augment.rescale(im, bboxes, output_scale)
-    #         if self._h_flip and flip_sign[idx] > 0.5:
-    #             im, bboxes = augment.horizontal_flip(im, bboxes)
-
-    #         im = augment.im_preserve_range(im, im_intensity)
-    #         bboxes = augment.remove_invalid_bbox(im, bboxes)
-
-    #         gt_mask = self._get_gt_mask(bboxes, class_labels, output_scale)
-
-    #         gt_mask_batch.append(gt_mask)
-    #         true_boxes[idx, :len(bboxes)] = bboxes
-    #         class_label_list.append(class_labels)
-    #         im_batch.append(im)
-    #     im_batch = np.array(im_batch)
-
-    #     if self._color:
-    #         im_batch = augment.change_color(im_batch, hue, saturate, brightness, intensity_scale=im_intensity)
-
-    #     gt_mask_batch = self._flatten_gt_mask(gt_mask_batch)
-
-    #     return np.array(im_batch), np.array(gt_mask_batch), true_boxes
+        classes = tf.reshape(classes_b[0], (self._max_bbox,))
+        return im, gt_mask, bboxes, classes
 
     def process_batch(self, output_scale):
         batch_data = self.dataflow.next_batch_dict()
@@ -286,63 +223,6 @@ class PreProcess(object):
             # print(col_id*anchor_stride, row_id*anchor_stride)
 
         return gt_mask#, out_anchor_list
-
-
-    def _get_yolo_target_anchor(self,
-                                label_batch, 
-                                im_shape_batch, 
-                                rescale_shape, 
-                                is_flatten=False):
-        # gt_bbox_batch [bsize, n_gt, 4] xyxy
-        # im_shape_batch [bsize, 2]
-
-        batch_gt_mask = []
-        init_anchors = self.init_anchors_dict[rescale_shape[0]]
-        anchor_list = init_anchors['anchors']
-        ind_list = init_anchors['index']
-        sub2ind = init_anchors['sub2ind']
-
-        # target_anchor_batch = [[] for _ in range(len(gt_bbox_batch))]
-        # b_id = -1
-        batch_gt_mask = []
-        for labels, im_shape in zip(label_batch, im_shape_batch):
-            # print(len(gt_bbox))
-            # b_id += 1
-            gt_mask = copy.deepcopy(self.init_gt_mask_dict[rescale_shape[0]])
-            gt_bbox_para, gt_bbox_label = self._convert_label(labels, im_shape, rescale_shape)
-            one_hot_label = vec2onehot(gt_bbox_label, self._n_class)
-            gt_cxy = np.stack(
-                [(gt_bbox_para[:, 0] + gt_bbox_para[:, 2]) / 2,
-                 (gt_bbox_para[:, 1] + gt_bbox_para[:, 3]) / 2], axis=-1)
-
-            iou_mat = bboxtool.bbox_list_IOU(
-                gt_bbox_para, bboxtool.cxywh2xyxy(self._anchor_boxes), align=True)
-            target_anchor_list = np.argmax(iou_mat, axis=-1)
-            # print()
-
-            for gt_id, (target_anchor_idx, gt_bbox) in enumerate(zip(target_anchor_list, gt_bbox_para)):
-                anchor_idx_list = []
-                for scale_id, stride in enumerate(self._stride_list):
-                    anchor_feat_cxy = gt_cxy[gt_id] // stride
-                    gt_feat_cxy =  gt_cxy[gt_id] / stride
-                    anchor_idx_list += sub2ind[(scale_id, anchor_feat_cxy[1], anchor_feat_cxy[0])]
-
-                anchor_idx = anchor_idx_list[target_anchor_idx]
-                scale_id, prior_id, row_id, col_id, anchor_xyxy, anchor_stride =\
-                    self._get_anchor_property(anchor_idx, ind_list)
-
-                gt_mask[scale_id][prior_id][row_id, col_id, :4] =\
-                    bboxtool.xyxy2yolotcoord([gt_bbox], anchor_xyxy, anchor_stride, [col_id, row_id])
-                gt_mask[scale_id][prior_id][row_id, col_id, 4] = 1
-                # TODO
-                # multi-class
-                gt_mask[scale_id][prior_id][row_id, col_id, 5:] = one_hot_label[gt_id]
-            batch_gt_mask.append(gt_mask)
-
-        if is_flatten:
-            batch_gt_mask = self._flatten_gt_mask(batch_gt_mask)
-
-        return np.array(batch_gt_mask)
 
     def _flatten_gt_mask(self, gt_mask_batch):
         flatten_gt_mask_batch = []
