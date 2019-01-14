@@ -10,6 +10,8 @@ from src.bbox.py_nms import non_max_suppression
 
 def detection(bbox_para, bbox_score, n_class, obj_score_thr, nms_iou_thr, label_dict,
               image_shape, rescale_shape, box_type='cxywh'):
+    """ apply non-maximum suppression to obtain the detection """
+    
     if not isinstance(rescale_shape, list):
         rescale_shape = [rescale_shape, rescale_shape]
 

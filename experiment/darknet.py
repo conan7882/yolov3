@@ -38,14 +38,18 @@ def predict():
     label_dict = loader.load_imagenet1k_label_darknet()
     # create a Dataflow object for test images
     image_data = loader.read_image(
-        im_name=FLAGS.im_name, n_channel=3,
-        data_dir=FLAGS.data_dir, batch_size=1,
-        rescale=FLAGS.rescale)
+        im_name=FLAGS.im_name, 
+        n_channel=3,
+        batch_size=1,
+        rescale=FLAGS.rescale,
+        data_dir=FLAGS.data_dir, )
 
     # create test model
     test_model = DarkNet53(
-        n_channel=3,n_class=1000,
-        pre_trained_path=FLAGS.pretrained_path, trainable=False)
+        n_channel=3,
+        n_class=1000,
+        pre_trained_path=FLAGS.pretrained_path, 
+        trainable=False)
     test_model.create_valid_model()
 
     with tf.Session() as sess:

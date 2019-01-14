@@ -114,8 +114,12 @@ def train():
             #     category_index, 
             #     config.save_path, 
             #     run_type='epoch')
-            
-            train_data_generator.init_iterator(sess)
+
+            if i > 0 and i % 10 == 0:
+                train_data_generator.init_iterator(sess, reset_scale=True)
+            else:
+                train_data_generator.init_iterator(sess, reset_scale=False)
+
             train_model.train_epoch(sess, lr, summary_writer=writer)
 
             valid_data_generator.init_iterator(sess)
@@ -123,8 +127,9 @@ def train():
 
             saver.save(sess, '{}/yolov3_epoch_{}'.format(config.save_path, i))
 
-            if i > 0 and i % 10 == 0:
-                train_data_generator.reset_im_scale()
+            # if i > 0 and i % 10 == 0:
+            #     train_data_generator.reset_im_scale()
+
     writer.close()
 
 def detect():

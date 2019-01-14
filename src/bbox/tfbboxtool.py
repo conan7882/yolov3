@@ -5,8 +5,6 @@
 
 import tensorflow as tf
 
-def yolotcoord2cxywh():
-    pass
 
 def xyxy2yxyx(bbox_list):
     return tf.stack([bbox_list[..., 1], bbox_list[..., 0],

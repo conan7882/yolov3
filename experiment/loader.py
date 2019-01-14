@@ -75,11 +75,11 @@ def load_VOC(rescale_shape_list,
     #     im_dir = '/home/qge2/workspace/data/dataset/VOCdevkit/VOC2012/JPEGImages/'
     #     xml_dir = '/home/qge2/workspace/data/dataset/VOCdevkit/VOC2012/Annotations/'
     # elif platform.node() == 'aros04':
-    #     im_dir = 'E:/Dataset/VOCdevkit/VOC2007/JPEGImages/'
-    #     xml_dir = 'E:/Dataset/VOCdevkit/VOC2007/Annotations/'
+    #     im_dir = 'E:/Dataset/VOCdevkit/test/JPEGImages/'
+    #     xml_dir = 'E:/Dataset/VOCdevkit/test/Annotations/'
     # else:
-    #     im_dir = '/Users/gq/workspace/Dataset/VOCdevkit/VOC2007/JPEGImages/'
-    #     xml_dir = '/Users/gq/workspace/Dataset/VOCdevkit/VOC2007/Annotations/'
+    #     im_dir = '/Users/gq/workspace/Dataset/VOCdevkit/test/JPEGImages/'
+    #     xml_dir = '/Users/gq/workspace/Dataset/VOCdevkit/test/Annotations/'
 
     class_name_dict, class_id_dict = get_class_dict_from_xml(xml_dir)
 
@@ -94,6 +94,7 @@ def load_VOC(rescale_shape_list,
             im = im / 255.
         return np.clip(im, 0., 1.)
 
+    # Load entire dataset
     voc_data = VOC(
         class_dict=class_name_dict,
         image_dir=im_dir,
@@ -105,11 +106,13 @@ def load_VOC(rescale_shape_list,
         )
     voc_data.setup(epoch_val=0, batch_size=1)
 
+    # divide dataset into training and validation set
     train_data, valid_date = dfoper.divide_dataflow(voc_data, divide_list=[train_percentage, 1 - train_percentage], shuffle=True)
 
     if n_class is None:
         n_class = len(class_name_dict)
 
+    # create training set Generator
     train_data_generator = generator.Generator(
         dataflow=train_data, 
         n_channle=3,
@@ -124,6 +127,7 @@ def load_VOC(rescale_shape_list,
         max_num_bbox_per_im=max_num_bbox_per_im)
     train_data_generator.reset_im_scale(scale=416)
 
+    # create validation set Generator
     valid_data_generator = generator.Generator(
         dataflow=valid_date, 
         n_channle=3,

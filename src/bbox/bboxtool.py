@@ -8,20 +8,6 @@ import src.utils.utils as utils
 
 SMALL_NUM = 1e-6
 
-# def correct_yolo_boxes(xy_grid_flatten, bbox, anchor, scale):
-#     # [bsize, h, w, 4]
-#     bsize = tf.shape(bbox)[0]
-#     shape = tf.shape(bbox)
-#     bbox_flatten = tf.reshape(bbox, (bsize, -1, 4))
-#     bbox_xy, bbox_wh = tf.split(bbox_flatten, [2, 2], axis=-1)
-#     bbox_xy = tf.nn.sigmoid(bbox_xy)
-#     bbox_xy = bbox_xy + xy_grid_flatten
-
-#     pw, ph = anchor[0], anchor[1]
-#     bwh = tf.multiply(anchor, tf.exp(bbox_wh))
-
-#     correct_bbox = tf.concat([bbox_xy * scale, bwh], axis=-1)
-#     return tf.reshape(correct_bbox, (bsize, shape[1], shape[2], 4))
 
 def inverse_sigmoid(x):
     return np.log(x / (1 - x + SMALL_NUM) + SMALL_NUM)
@@ -66,53 +52,6 @@ def xyxy2cxywh(bbox_list):
 def xyxy2yxyx(bbox_list):
     return np.stack([bbox_list[..., 1], bbox_list[..., 0],
                      bbox_list[..., 3], bbox_list[..., 2]], axis=-1)
-
-# def bbox_area(box):
-#     return (box[2] - box[0] + 1) * (box[3] - box[1] + 1)
-
-# def bbox_intersec_area(box_1, box_2, align=False):
-#     """ Compute intersection area of two bbox
-        
-#         Args:
-#             box_1, box_2 (list): bounding box pair
-#             align (bool): Whether align the center of bbox or not 
-
-#         Returns:
-#             intersection area of two bbox (float)
-#     """
-#     box = [box_2]
-#     box.append(box_1)
-#     box = np.array(box) 
-#     if not align:
-#         ibox = np.append(np.amax(np.array(box[:, :2]), axis=0),
-#                          np.amin(np.array(box[:, 2:]), axis=0))
-#         iw = ibox[2] - ibox[0] + 1
-#         ih = ibox[3] - ibox[1] + 1
-#         return 0 if iw < 0 or ih < 0 else iw*ih
-#     else:
-#         width = np.amin(box[:, 2] - box[:, 0]) + 1
-#         height = np.amin(box[:, 3] - box[:, 1]) + 1
-#         return width * height
-        
-# # def bbox_intersec(box_1, box_2):
-# #     box_2 = [box_2]
-# #     box_2.append(box_1)
-# #     box_2 = np.array(box_2)
-# #     return np.append(np.amax(np.array(box_2[:, :2]), axis=0),
-# #                      np.amin(np.array(box_2[:, 2:]), axis=0))
-
-# def bbox_IOU(box_1, box_2, align=False):
-#     """ Compute IOU between two bbox
-        
-#         Args:
-#             box_1, box_2 (list): bounding box pair
-#             align (bool): Whether align the center of bbox or not 
-
-#         Returns:
-#             IOU between two bbox (float)
-#     """
-#     inter_area = bbox_intersec_area(box_1, box_2, align=align)
-#     return inter_area / (bbox_area(box_1) + bbox_area(box_2) - inter_area)
 
 def rescale_bbox(bbox_list, from_shape, to_shape):
     # from_shape, to_shape [h, w]
@@ -190,6 +129,68 @@ def affine_transform_bbox(bboxes, T, from_shape, to_shape):
     bboxes[...,[1, 3]] = (bboxes[...,[1, 3]] + 1) / 2. * to_shape[0]
 
     return bboxes
+
+# def bbox_area(box):
+#     return (box[2] - box[0] + 1) * (box[3] - box[1] + 1)
+
+# def bbox_intersec_area(box_1, box_2, align=False):
+#     """ Compute intersection area of two bbox
+        
+#         Args:
+#             box_1, box_2 (list): bounding box pair
+#             align (bool): Whether align the center of bbox or not 
+
+#         Returns:
+#             intersection area of two bbox (float)
+#     """
+#     box = [box_2]
+#     box.append(box_1)
+#     box = np.array(box) 
+#     if not align:
+#         ibox = np.append(np.amax(np.array(box[:, :2]), axis=0),
+#                          np.amin(np.array(box[:, 2:]), axis=0))
+#         iw = ibox[2] - ibox[0] + 1
+#         ih = ibox[3] - ibox[1] + 1
+#         return 0 if iw < 0 or ih < 0 else iw*ih
+#     else:
+#         width = np.amin(box[:, 2] - box[:, 0]) + 1
+#         height = np.amin(box[:, 3] - box[:, 1]) + 1
+#         return width * height
+        
+# # def bbox_intersec(box_1, box_2):
+# #     box_2 = [box_2]
+# #     box_2.append(box_1)
+# #     box_2 = np.array(box_2)
+# #     return np.append(np.amax(np.array(box_2[:, :2]), axis=0),
+# #                      np.amin(np.array(box_2[:, 2:]), axis=0))
+
+# def bbox_IOU(box_1, box_2, align=False):
+#     """ Compute IOU between two bbox
+        
+#         Args:
+#             box_1, box_2 (list): bounding box pair
+#             align (bool): Whether align the center of bbox or not 
+
+#         Returns:
+#             IOU between two bbox (float)
+#     """
+#     inter_area = bbox_intersec_area(box_1, box_2, align=align)
+#     return inter_area / (bbox_area(box_1) + bbox_area(box_2) - inter_area)
+
+# def correct_yolo_boxes(xy_grid_flatten, bbox, anchor, scale):
+#     # [bsize, h, w, 4]
+#     bsize = tf.shape(bbox)[0]
+#     shape = tf.shape(bbox)
+#     bbox_flatten = tf.reshape(bbox, (bsize, -1, 4))
+#     bbox_xy, bbox_wh = tf.split(bbox_flatten, [2, 2], axis=-1)
+#     bbox_xy = tf.nn.sigmoid(bbox_xy)
+#     bbox_xy = bbox_xy + xy_grid_flatten
+
+#     pw, ph = anchor[0], anchor[1]
+#     bwh = tf.multiply(anchor, tf.exp(bbox_wh))
+
+#     correct_bbox = tf.concat([bbox_xy * scale, bwh], axis=-1)
+#     return tf.reshape(correct_bbox, (bsize, shape[1], shape[2], 4))
 
 # def bbox_ele_IoU(bbox_list_1, bbox_list_2):
 #     # box [xmin, ymin, xmax, ymax]

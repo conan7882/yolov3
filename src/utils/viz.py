@@ -9,8 +9,8 @@ import tensorflow as tf
 import matplotlib
 import platform
 import scipy.misc
-# if platform.node() == 'arostitan':
-matplotlib.use('Agg')
+if platform.node() == 'arostitan':
+    matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import src.bbox.tfbboxtool as tfbboxtool

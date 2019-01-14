@@ -13,7 +13,6 @@ import sys
 sys.path.append('../')
 import loader
 import configs.parsecfg as parscfg
-import src.bbox.bboxgt as bboxgt
 
 import src.utils.image as image
 import src.dataflow.augmentation as augment
@@ -160,7 +159,6 @@ def test_input():
          num_parallel_preprocess=2,
          h_flip=True, crop=True, color=True, affine=True,
          max_num_bbox_per_im=45)
-
     print(valid_data_generator.batch_data)
 
     with tf.Session() as sess:
@@ -169,18 +167,19 @@ def test_input():
 
         for epoch in range(10):
             print('epoch: {}'.format(epoch))
-            train_data_generator.init_iterator(sess)
+            train_data_generator.init_iterator(sess, reset_scale=True)
             while True:
                 try:
+                    # train_data_generator.init_iterator(sess, reset_scale=True)
+                    # train_data_generator.reset_im_scale()
                     start_time = time.time()
                     t = sess.run(train_data_generator.batch_data)
                     print(time.time() - start_time)
                     print(t[0].shape)
                     print(t[-1].shape)
-                    viz.draw_bounding_box(t[0][0]*255, t[-1][0], label_list=None, box_type='xyxy')
+                    viz.draw_bounding_box(t[0][0]*255, t[2][0], label_list=None, box_type='xyxy')
                 except tf.errors.OutOfRangeError:
                     break
-            pre.set_output_scale(416)
 
 # def test_divide_df():
 #     import src.utils.viz as viz

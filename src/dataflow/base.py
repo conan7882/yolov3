@@ -155,65 +155,65 @@ class DataFlow(object):
 
 
 
-class DetectionDataFlow(DataFlow):
-    def __init__(self,
-                 data_name_list,
-                 data_dir='',
-                 shuffle=True,
-                 batch_dict_name=None,
-                 load_fnc_list=None,):
+# class DetectionDataFlow(DataFlow):
+#     def __init__(self,
+#                  data_name_list,
+#                  data_dir='',
+#                  shuffle=True,
+#                  batch_dict_name=None,
+#                  load_fnc_list=None,):
 
-        # self._max_bbox = max_bbox_per_image
-        # self._sample_in_batch = 0
+#         # self._max_bbox = max_bbox_per_image
+#         # self._sample_in_batch = 0
 
-        super(DetectionDataFlow, self).__init__(
-            data_name_list=data_name_list,
-            data_dir=data_dir,
-            shuffle=shuffle,
-            batch_dict_name=batch_dict_name,
-            load_fnc_list=load_fnc_list,
-            )
+#         super(DetectionDataFlow, self).__init__(
+#             data_name_list=data_name_list,
+#             data_dir=data_dir,
+#             shuffle=shuffle,
+#             batch_dict_name=batch_dict_name,
+#             load_fnc_list=load_fnc_list,
+#             )
 
-    def next_batch(self):
-        assert self._batch_size <= self.size(), \
-        "batch_size cannot be larger than data size"
+#     def next_batch(self):
+#         assert self._batch_size <= self.size(), \
+#         "batch_size cannot be larger than data size"
 
-        if self._data_id + self._batch_size > self.size():
-            start = self._data_id
-            end = self.size()
-        else:
-            start = self._data_id
-            self._data_id += self._batch_size
-            end = self._data_id
+#         if self._data_id + self._batch_size > self.size():
+#             start = self._data_id
+#             end = self.size()
+#         else:
+#             start = self._data_id
+#             self._data_id += self._batch_size
+#             end = self._data_id
         
-        self._sample_in_batch = 0
-        cur_bsize = end - start
-        # self.true_boxes = np.zeros([cur_bsize, self._max_bbox, 4])
-        batch_data = self._load_data(start, end)
+#         self._sample_in_batch = 0
+#         cur_bsize = end - start
+#         # self.true_boxes = np.zeros([cur_bsize, self._max_bbox, 4])
+#         batch_data = self._load_data(start, end)
 
-        for flow_id in range(len(self._file_name_list)):
-            self._cur_file_name[flow_id] = self._file_name_list[flow_id][start: end]
+#         for flow_id in range(len(self._file_name_list)):
+#             self._cur_file_name[flow_id] = self._file_name_list[flow_id][start: end]
 
-        if end == self.size():
-            self._epochs_completed += 1
-            self._data_id = 0
-            if self._shuffle:
-                self._suffle_file_list()
-        return batch_data
+#         if end == self.size():
+#             self._epochs_completed += 1
+#             self._data_id = 0
+#             if self._shuffle:
+#                 self._suffle_file_list()
+#         return batch_data
 
-    def _load_data(self, start, end):
-        data_list = [[] for i in range(0, self._n_dataflow)]
-        for k in range(start, end):
-            for read_idx, read_fnc in enumerate(self._load_fnc_list):
-                data = read_fnc(self._file_name_list[read_idx][k])
-                data_list[read_idx].append(data)
-            self._sample_in_batch += 1
-        # data_list.append(self.true_boxes)
+#     def _load_data(self, start, end):
+#         data_list = [[] for i in range(0, self._n_dataflow)]
+#         for k in range(start, end):
+#             for read_idx, read_fnc in enumerate(self._load_fnc_list):
+#                 data = read_fnc(self._file_name_list[read_idx][k])
+#                 data_list[read_idx].append(data)
+#             self._sample_in_batch += 1
+#         # data_list.append(self.true_boxes)
 
-        for idx, data in enumerate(data_list):
-            try:
-                data_list[idx] = np.array(data)
-            except ValueError:
-                data_list[idx] = data
+#         for idx, data in enumerate(data_list):
+#             try:
+#                 data_list[idx] = np.array(data)
+#             except ValueError:
+#                 data_list[idx] = data
 
-        return data_list
+#         return data_list

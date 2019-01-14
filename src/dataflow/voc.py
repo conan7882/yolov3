@@ -7,13 +7,13 @@ import os
 import re
 import numpy as np
 
-from src.dataflow.base import DetectionDataFlow
+from src.dataflow.base import DataFlow
 import src.utils.utils as utils
 from src.utils.dataflow import identity, fill_pf_list, get_file_list
 from src.utils.dataflow import load_image, get_voc_bbox, parse_bbox_xml
 
 
-class VOC(DetectionDataFlow):
+class VOC(DataFlow):
     """ dataflow for CelebA dataset """
     def __init__(self,
                  class_dict,

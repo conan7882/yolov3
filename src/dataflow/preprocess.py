@@ -9,7 +9,7 @@ import tensorflow as tf
 import src.bbox.bboxtool as bboxtool
 from src.utils.dataflow import vec2onehot
 import src.dataflow.augmentation as augment
-from src.dataflow.base import DetectionDataFlow
+from src.dataflow.base import DataFlow
 
 
 class PreProcess(object):
@@ -25,7 +25,9 @@ class PreProcess(object):
         self._affine = affine
         self._im_intensity = im_intensity
 
-        assert isinstance(dataflow, DetectionDataFlow)
+        self.output_scale = tf.placeholder(tf.float32, name='scale')
+
+        assert isinstance(dataflow, DataFlow)
         self.dataflow = dataflow
         anchor_list = np.reshape(prior_list, (-1,2))
         # cxywh
@@ -73,34 +75,35 @@ class PreProcess(object):
                             anchor_cnt += 1
             self.init_anchors_dict[rescale_shape[0]] = {'index': ind_list, 'sub2ind': sub2ind_dict}
 
-    def set_output_scale(self, scale):
-        if isinstance(scale, int):
-            self._output_scale = [scale, scale]
-        else:
-            assert len(scale) == 2
-            self._output_scale = scale
+    # def set_output_scale(self, scale):
+    #     if isinstance(scale, int):
+    #         self._output_scale = [scale, scale]
+    #     else:
+    #         assert len(scale) == 2
+    #         self._output_scale = scale
 
     def tf_process_batch(self, batch_im, batch_labels):
-        output_scale = self._output_scale
+        # output_scale = self._output_scale[0]
+        output_scale = self.output_scale
 
-        def _process_batch(batch_im, batch_labels):
+        def _process_batch(batch_im, batch_labels, output_scale):
             true_boxes = np.zeros([len(batch_im), self._max_bbox, 4])
             true_classes = -1. * np.ones([len(batch_im), self._max_bbox])
             gt_mask_batch = []
             im_batch = []
+
             for idx, (im, labels) in enumerate(zip(batch_im, batch_labels)):
                 bboxes = np.array([bbox[1:] for bbox in labels])
                 class_labels = [int(bbox[0]) for bbox in labels]
                 im, bboxes, im_shape = self._augment(im, bboxes)
-
-                im, bboxes = augment.rescale(im, bboxes, output_scale)
+                im, bboxes = augment.rescale(im, bboxes, [output_scale, output_scale])
 
                 im_batch.append(im)
                 n_sample = np.minimum(self._max_bbox, len(bboxes))
                 true_boxes[idx, :n_sample] = bboxes[:n_sample]
                 true_classes[idx, :n_sample] = class_labels[:n_sample]
                 
-                gt_mask = self._get_gt_mask(bboxes, class_labels, output_scale)
+                gt_mask = self._get_gt_mask(bboxes, class_labels, [output_scale, output_scale])
                 gt_mask_batch.append(gt_mask)
 
             gt_mask_batch = self._flatten_gt_mask(gt_mask_batch)
@@ -111,11 +114,11 @@ class PreProcess(object):
 
         im_b, gt_mask_b, boxes_b , classes_b = tf.py_func(
             _process_batch,
-            [batch_im, batch_labels],
+            [batch_im, batch_labels, output_scale],
             [tf.float32, tf.float32, tf.float32, tf.float32],
             name="map_fnc")
-
-        im = tf.reshape(im_b[0], (output_scale[0], output_scale[1], batch_im.shape[-1]))
+        
+        im = tf.reshape(im_b[0], (tf.shape(im_b[0])[0], tf.shape(im_b[0])[1], batch_im.shape[-1]))
         gt_mask = tf.reshape(gt_mask_b[0], (-1, self._yolo_single_out_dim))
         bboxes = tf.reshape(boxes_b[0], (self._max_bbox, 4))
         classes = tf.reshape(classes_b[0], (self._max_bbox,))
@@ -140,7 +143,6 @@ class PreProcess(object):
             hue = np.random.uniform(low=-0.2, high=0.2)
             saturate = np.random.uniform(low=0.9, high=1.1)
             brightness = np.random.uniform(low=0.5, high=1)
-            im = augment.change_color(im, hue, saturate, brightness, intensity_scale=self._im_intensity)
         if self._affine:
             a_scale = np.random.uniform(low=0.9, high=1.1, size=2)
             a_trans = np.random.uniform(low=-0.3, high=0.3, size=2)

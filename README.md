@@ -76,11 +76,11 @@
 - Result images are saved in `save_path` setting in `configs/pretrain_coco_path.cfg`.
 
 ### Sample results
-<img src='docs/figs/pretrained/im0.png' height='350px'>
+<img src='docs/figs/pretrained/im0.png' height='300px'>
 <!--<img src='docs/figs/pretrained/im1.png' height='350px'>-->
-<img src='docs/figs/pretrained/im2.png' height='350px'>
-<img src='docs/figs/pretrained/im3.png' height='400px'>
-<img src='docs/figs/pretrained/im4.png' height='400px'>
+<img src='docs/figs/pretrained/im2.png' height='300px'>
+<img src='docs/figs/pretrained/im3.png' height='300px'>
+<img src='docs/figs/pretrained/im4.png' height='300px'>
 
 ## Train on [VOC2012](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/) dataset (20 classes)
 ### Prepare dataset and pre-trained feature extractor
@@ -125,7 +125,7 @@
 - Validation image are all rescaled to 416 * 416 without augmentation for validation.
 - The learning rate schedule needs to be further tuned, but the current setting is: 0.1 (1-50 epochs), 0.01 (51-100 epochs) and 0.001 (101-150 epochs).
 - Tensorboard summary includes losses and sample predictions for both training set (every 100 steps) and validation set (every epoch) are saved in `save_path` in `configs/config_path.cfg`. Note that non-maximum suppression does not used in sample predictions and only top 20 predicted bounding boxes based on class score are shown. You can see how the model is doing during training: 
-  <img src='docs/figs/train/tensorboard.png' height='350px'>
+  <img src='docs/figs/train/tensorboard.png' height='400px'>
 
 ### Sample results
 - Prediction after 150 epochs. Performance evaluation will be added soon.
