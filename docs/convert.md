@@ -7,7 +7,7 @@
 
 ## Format of `.weight`
 - The first four 32-bit integers are: major version, minor version, revision, images seen.
-- After the first four intergers, learned parameters (weights, bias and batch normalization parameters) for each convolutional layers are stored as float32 following the network layout (parsed from `.cfg` file).
+- After the first four integers, learned parameters (weights, bias and batch normalization parameters) for each convolutional layers are stored as float32 following the network layout (parsed from `.cfg` file).
 - For each convolutional layer with/without batch normalization(BN), the parameters are saved with their corresponding length in the order of (check [here](https://github.com/pjreddie/darknet/blob/b13f67bfdd87434e141af532cdb5dc1b8369aa3b/src/parser.c#L958) for reference):
 
    | *No BN* | *With BN* |
@@ -83,7 +83,7 @@ The first 52 layers of DarkNet-53 are used as feature extractor, so the layer na
 
 
 ### Reference code
-
+- https://github.com/pjreddie/darknet
 - https://github.com/qqwweee/keras-yolo3
    
 ## Author

@@ -208,7 +208,7 @@ if __name__ == '__main__':
     elif FLAGS.model == 'yolov3_feat':
         # convert Darknet53 first 52 conv layers for feature extration in yolov3
         config_path = 'yolov3_feat.cfg'
-        weights_path = os.path.join(weights_dir, 'yolov3.weights')
+        weights_path = os.path.join(weights_dir, 'darknet53_448.weights')
         save_path = os.path.join(save_dir, 'yolov3_feat.npy')
     elif FLAGS.model == 'yolo':
         # convert yolov3 trained on COCO dataset

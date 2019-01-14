@@ -58,6 +58,7 @@ def load_imagenet1k_label_darknet():
 def load_VOC(rescale_shape_list,
              net_stride_list, 
              prior_anchor_list, 
+             data_dir='',
              train_percentage=0.7,
              n_class=None, 
              max_num_bbox_per_im=45,
@@ -67,15 +68,18 @@ def load_VOC(rescale_shape_list,
              h_flip=True, crop=True, color=True, affine=True):
     assert 0 < train_percentage <= 1.
 
-    if platform.node() == 'arostitan':
-        im_dir = '/home/qge2/workspace/data/dataset/VOCdevkit/VOC2012/JPEGImages/'
-        xml_dir = '/home/qge2/workspace/data/dataset/VOCdevkit/VOC2012/Annotations/'
-    elif platform.node() == 'aros04':
-        im_dir = 'E:/Dataset/VOCdevkit/VOC2007/JPEGImages/'
-        xml_dir = 'E:/Dataset/VOCdevkit/VOC2007/Annotations/'
-    else:
-        im_dir = '/Users/gq/workspace/Dataset/VOCdevkit/VOC2007/JPEGImages/'
-        xml_dir = '/Users/gq/workspace/Dataset/VOCdevkit/VOC2007/Annotations/'
+    im_dir = os.path.join(data_dir, 'JPEGImages')
+    xml_dir = os.path.join(data_dir, 'Annotations')
+
+    # if platform.node() == 'arostitan':
+    #     im_dir = '/home/qge2/workspace/data/dataset/VOCdevkit/VOC2012/JPEGImages/'
+    #     xml_dir = '/home/qge2/workspace/data/dataset/VOCdevkit/VOC2012/Annotations/'
+    # elif platform.node() == 'aros04':
+    #     im_dir = 'E:/Dataset/VOCdevkit/VOC2007/JPEGImages/'
+    #     xml_dir = 'E:/Dataset/VOCdevkit/VOC2007/Annotations/'
+    # else:
+    #     im_dir = '/Users/gq/workspace/Dataset/VOCdevkit/VOC2007/JPEGImages/'
+    #     xml_dir = '/Users/gq/workspace/Dataset/VOCdevkit/VOC2007/Annotations/'
 
     class_name_dict, class_id_dict = get_class_dict_from_xml(xml_dir)
 

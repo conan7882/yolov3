@@ -8,50 +8,16 @@ import numpy as np
 import tensorflow as tf
 import src.bbox.bboxtool as bboxtool
 from src.utils.dataflow import vec2onehot
-from src.dataflow.base import DetectionDataFlow
 import src.dataflow.augmentation as augment
-import src.utils.image as imagetool
+from src.dataflow.base import DetectionDataFlow
 
 
 class PreProcess(object):
+    """ Data augmentation and rescale images """
     def __init__(self, dataflow, rescale_shape_list, stride_list, prior_list, n_class,
                  h_flip=False, crop=False, color=False, affine=False, im_intensity = 1.,
                  max_num_bbox_per_im=45):
 
-        def _augment(im, bbox):
-
-            im = np.array(im)
-            im_h, im_w = im.shape[0], im.shape[1]
-            if h_flip and np.random.random() > 0.5:
-                im, bbox = augment.horizontal_flip(im, bbox)
-            if crop:
-                new_h = int(im_h * np.random.uniform(low=0.7, high=1.))
-                new_w = int(im_w * np.random.uniform(low=0.7, high=1.))
-                if np.random.random() > 0.5:
-                    im, bbox = augment.center_crop(im, bbox, [new_h, new_w])
-                else:
-                    start_y = int(np.random.uniform(low=0., high=im_h - new_h))
-                    start_x = int(np.random.uniform(low=0., high=im_w - new_w))
-                    im, bbox = augment.crop(im, bbox, [start_y, start_x, new_h, new_w])
-            if color:
-                hue = np.random.uniform(low=-0.2, high=0.2)
-                saturate = np.random.uniform(low=0.9, high=1.1)
-                brightness = np.random.uniform(low=0.5, high=1)
-                im = augment.change_color(im, hue, saturate, brightness, intensity_scale=im_intensity)
-            if affine:
-                a_scale = np.random.uniform(low=0.9, high=1.1, size=2)
-                a_trans = np.random.uniform(low=-0.3, high=0.3, size=2)
-                a_shear = np.random.uniform(low=-0.2, high=0.2, size=2)
-                angle = np.random.uniform(low=-15, high=15)
-                im, bbox = augment.affine_transform(
-                    im, bbox, scale=a_scale, translation=a_trans, shear=a_shear, angle=angle)
-
-            im = augment.im_preserve_range(im, im_intensity)
-            bbox = augment.remove_invalid_bbox(im, bbox)
-
-            return im, bbox, (im_h, im_w)
-
-        self._aug_fnc = _augment
         self._max_bbox = max_num_bbox_per_im
         self._h_flip = h_flip
         self._crop = crop
@@ -125,7 +91,7 @@ class PreProcess(object):
             for idx, (im, labels) in enumerate(zip(batch_im, batch_labels)):
                 bboxes = np.array([bbox[1:] for bbox in labels])
                 class_labels = [int(bbox[0]) for bbox in labels]
-                im, bboxes, im_shape = self._aug_fnc(im, bboxes)
+                im, bboxes, im_shape = self._augment(im, bboxes)
 
                 im, bboxes = augment.rescale(im, bboxes, output_scale)
 
@@ -155,27 +121,38 @@ class PreProcess(object):
         classes = tf.reshape(classes_b[0], (self._max_bbox,))
         return im, gt_mask, bboxes, classes
 
-    def process_batch(self, output_scale):
-        batch_data = self.dataflow.next_batch_dict()
+    def _augment(self, im, bbox):
 
-        true_boxes = np.zeros([len(batch_data['image']), self._max_bbox, 4])
-        gt_mask_batch = []
-        im_batch = []
-        for idx, (im, labels) in enumerate(zip(batch_data['image'], batch_data['label'])):
-            bboxes = np.array([bbox[1:] for bbox in labels])
-            class_labels = [int(bbox[0]) for bbox in labels]
-            im, bboxes, im_shape = self._aug_fnc(im, bboxes)
+        im = np.array(im)
+        im_h, im_w = im.shape[0], im.shape[1]
+        if self._h_flip and np.random.random() > 0.5:
+            im, bbox = augment.horizontal_flip(im, bbox)
+        if self._crop:
+            new_h = int(im_h * np.random.uniform(low=0.7, high=1.))
+            new_w = int(im_w * np.random.uniform(low=0.7, high=1.))
+            if np.random.random() > 0.5:
+                im, bbox = augment.center_crop(im, bbox, [new_h, new_w])
+            else:
+                start_y = int(np.random.uniform(low=0., high=im_h - new_h))
+                start_x = int(np.random.uniform(low=0., high=im_w - new_w))
+                im, bbox = augment.crop(im, bbox, [start_y, start_x, new_h, new_w])
+        if self._color:
+            hue = np.random.uniform(low=-0.2, high=0.2)
+            saturate = np.random.uniform(low=0.9, high=1.1)
+            brightness = np.random.uniform(low=0.5, high=1)
+            im = augment.change_color(im, hue, saturate, brightness, intensity_scale=self._im_intensity)
+        if self._affine:
+            a_scale = np.random.uniform(low=0.9, high=1.1, size=2)
+            a_trans = np.random.uniform(low=-0.3, high=0.3, size=2)
+            a_shear = np.random.uniform(low=-0.2, high=0.2, size=2)
+            angle = np.random.uniform(low=-15, high=15)
+            im, bbox = augment.affine_transform(
+                im, bbox, scale=a_scale, translation=a_trans, shear=a_shear, angle=angle)
 
-            im, bboxes = augment.rescale(im, bboxes, output_scale)
+        im = augment.im_preserve_range(im, self._im_intensity)
+        bbox = augment.remove_invalid_bbox(im, bbox)
 
-            im_batch.append(im)
-            true_boxes[idx, :len(bboxes)] = bboxes
-            
-            gt_mask = self._get_gt_mask(bboxes, class_labels, output_scale)
-            gt_mask_batch.append(gt_mask)
-
-        gt_mask_batch = self._flatten_gt_mask(gt_mask_batch)
-        return np.array(im_batch), np.array(gt_mask_batch), true_boxes
+        return im, bbox, (im_h, im_w)
 
     def _get_gt_mask(self, gt_bboxes, class_labels, rescale_shape):
 
@@ -217,8 +194,6 @@ class PreProcess(object):
             gt_mask[scale_id][prior_id][row_id, col_id, 5:] = one_hot_label[gt_id]
             # out_anchor_list.append(anchor_list[anchor_idx])
             # out_anchor_list.append([col_id*anchor_stride, row_id*anchor_stride] + anchor_xyxy)
-            # print(anchor_list[anchor_idx])
-            # print(col_id*anchor_stride, row_id*anchor_stride)
 
         return gt_mask#, out_anchor_list
 
@@ -249,5 +224,27 @@ class PreProcess(object):
         anchor_xyxy = index_dict['anchor']
         anchor_stride = index_dict['stride']
         return scale_id, prior_id, row_id, col_id, anchor_xyxy, anchor_stride
+
+    # def process_batch(self, output_scale):
+    #     batch_data = self.dataflow.next_batch_dict()
+
+    #     true_boxes = np.zeros([len(batch_data['image']), self._max_bbox, 4])
+    #     gt_mask_batch = []
+    #     im_batch = []
+    #     for idx, (im, labels) in enumerate(zip(batch_data['image'], batch_data['label'])):
+    #         bboxes = np.array([bbox[1:] for bbox in labels])
+    #         class_labels = [int(bbox[0]) for bbox in labels]
+    #         im, bboxes, im_shape = self._aug_fnc(im, bboxes)
+
+    #         im, bboxes = augment.rescale(im, bboxes, output_scale)
+
+    #         im_batch.append(im)
+    #         true_boxes[idx, :len(bboxes)] = bboxes
+            
+    #         gt_mask = self._get_gt_mask(bboxes, class_labels, output_scale)
+    #         gt_mask_batch.append(gt_mask)
+
+    #     gt_mask_batch = self._flatten_gt_mask(gt_mask_batch)
+    #     return np.array(im_batch), np.array(gt_mask_batch), true_boxes
 
     

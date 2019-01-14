@@ -28,6 +28,8 @@ class ConfigParser(object):
         self.save_path = self._get_value(self.pathconfig, 'save_path')
         self.im_name = self._get_value(self.pathconfig, 'test_image_name')
 
+        self.train_data_dir = self._get_value(self.pathconfig, 'train_data_path')
+
         self.im_rescale = self._get_value(self.netconfig, 'rescale')
         self.mutliscale = self._get_value(self.netconfig, 'multiscale')
         self.n_channel = self._get_value(self.netconfig, 'n_channel')
@@ -101,6 +103,7 @@ class ConfigParser(object):
                 # cfg_parser[section]['save_path']
                 
                 cfg_dict['test_image_path'] = self._get_str(cfg_parser, section, 'test_image_path')
+                cfg_dict['train_data_path'] = self._get_str(cfg_parser, section, 'train_data_path')
                 # cfg_parser[section]['test_image']
                 cfg_dict['test_image_name'] = self._get_str(cfg_parser, section, 'test_image_name')
                 # cfg_parser[section]['test_image_name']

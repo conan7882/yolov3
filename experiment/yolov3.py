@@ -30,20 +30,21 @@ def get_args():
 
 def train():
     FLAGS = get_args()
-    config = parscfg.ConfigParser('configs/{}_path.cfg'.format(platform.node()),
+    config = parscfg.ConfigParser('configs/config_path.cfg',
                                   'configs/voc.cfg')
 
     label_dict, category_index, train_data_generator, valid_data_generator = loader.load_VOC(
-         rescale_shape_list=config.mutliscale,
-         net_stride_list=[32, 16, 8], 
-         prior_anchor_list=config.anchors,
-         train_percentage=0.85,
-         n_class=config.n_class,
-         batch_size=config.train_bsize, 
-         buffer_size=4,
-         num_parallel_preprocess=8,
-         h_flip=True, crop=True, color=True, affine=True,
-         max_num_bbox_per_im=57)
+        data_dir=config.train_data_dir,
+        rescale_shape_list=config.mutliscale,
+        net_stride_list=[32, 16, 8], 
+        prior_anchor_list=config.anchors,
+        train_percentage=0.85,
+        n_class=config.n_class,
+        batch_size=config.train_bsize, 
+        buffer_size=4,
+        num_parallel_preprocess=8,
+        h_flip=True, crop=True, color=True, affine=True,
+        max_num_bbox_per_im=57)
 
     # Training
     train_model = YOLOv3(
@@ -85,7 +86,7 @@ def train():
     #     rescale=test_scale)
 
     writer = tf.summary.FileWriter(config.save_path)
-    saver = tf.train.Saver()
+    saver = tf.train.Saver(max_to_keep=5)
     # saver = tf.train.Saver(
     #     var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='style_net'))
     sessconfig = tf.ConfigProto()
@@ -95,10 +96,10 @@ def train():
         sess.graph.finalize()
         writer.add_graph(sess.graph)
 
-        for i in range(150*3):
-            if i >= 100*3:
+        for i in range(150):
+            if i >= 100:
                 lr = FLAGS.lr / 100.
-            elif i >= 50*2:
+            elif i >= 50:
                 lr = FLAGS.lr / 10.
             else:
                 lr = FLAGS.lr
@@ -120,14 +121,14 @@ def train():
             valid_data_generator.init_iterator(sess)
             valid_model.valid_epoch(sess, summary_writer=writer)
 
-            # saver.save(sess, '{}/yolov3_epoch_{}'.format(config.save_path, i))
+            saver.save(sess, '{}/yolov3_epoch_{}'.format(config.save_path, i))
 
-            if i > 0 and i % 20 == 0:
+            if i > 0 and i % 10 == 0:
                 train_data_generator.reset_im_scale()
     writer.close()
 
 def detect():
-    config = parscfg.ConfigParser('configs/{}_path.cfg'.format(platform.node()),
+    config = parscfg.ConfigParser('configs/config_path.cfg',
                                   'configs/coco80.cfg')
 
     label_dict, category_index = loader.load_coco80_label_yolo()
