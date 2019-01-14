@@ -11,9 +11,9 @@
 
 - [x] Convert pre-trained `.weights` model to `.npy` file ([detail](docs/convert.md)).
 - [x] Pre-trained DarkNet-53 for image classification ([detail](docs/darknet.md)).
-- [x] Object detection using pre-trained YOLOv3 trained on [COCO](http://cocodataset.org/#home) dataset **detail**.
+- [x] Object detection using pre-trained YOLOv3 trained on [COCO](http://cocodataset.org/#home) dataset ([detail](https://github.com/conan7882/YOLOv3/tree/master#use-pre-trained-model-for-object-detection-80-classes)).
 - [x] YOLOv3 training pipeline
-- [x] Train on VOC dataset **detail**.
+- [x] Train on VOC dataset ([detail](https://github.com/conan7882/YOLOv3/tree/master#train-on-voc2012-dataset-20-classes)).
 - [ ] Performance evaluation.
 - [ ] Train on custom dataset.
 
@@ -31,7 +31,7 @@
 -->
 ## Use pre-trained model for object detection (80 classes)
 ### Convert pre-trained model
-- Download the pre-trained model from [here](https://pjreddie.com/darknet/yolo/) (Section 'Performance on the COCO Dataset', YOLOv3-416 [link](https://pjreddie.com/media/files/yolov3.weights))
+- Download the pre-trained model from [here](https://pjreddie.com/darknet/yolo/) (Section 'Performance on the COCO Dataset', YOLOv3-416 [link](https://pjreddie.com/media/files/yolov3.weights)).
 - To convert the model stored in `.weights` file to `.npy` file, go to `experiment/convert/`, run
  
   ```
@@ -76,11 +76,11 @@
 - Result images are saved in `save_path` setting in `configs/pretrain_coco_path.cfg`.
 
 ### Sample results
+<img src='docs/figs/pretrained/im3.png' height='300px'>
 <img src='docs/figs/pretrained/im0.png' height='300px'>
 <!--<img src='docs/figs/pretrained/im1.png' height='350px'>-->
-<img src='docs/figs/pretrained/im2.png' height='300px'>
-<img src='docs/figs/pretrained/im3.png' height='300px'>
 <img src='docs/figs/pretrained/im4.png' height='300px'>
+<img src='docs/figs/pretrained/im2.png' height='300px'>
 
 ## Train on [VOC2012](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/) dataset (20 classes)
 ### Prepare dataset and pre-trained feature extractor
