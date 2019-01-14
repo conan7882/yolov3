@@ -37,13 +37,13 @@ def train():
          rescale_shape_list=config.mutliscale,
          net_stride_list=[32, 16, 8], 
          prior_anchor_list=config.anchors,
-         train_percentage=0.7,
+         train_percentage=0.85,
          n_class=config.n_class,
          batch_size=config.train_bsize, 
          buffer_size=4,
          num_parallel_preprocess=8,
          h_flip=True, crop=True, color=True, affine=True,
-         max_num_bbox_per_im=45)
+         max_num_bbox_per_im=57)
 
     # Training
     train_model = YOLOv3(
@@ -113,12 +113,13 @@ def train():
             #     category_index, 
             #     config.save_path, 
             #     run_type='epoch')
+            
+            train_data_generator.init_iterator(sess)
+            train_model.train_epoch(sess, lr, summary_writer=writer)
 
             valid_data_generator.init_iterator(sess)
             valid_model.valid_epoch(sess, summary_writer=writer)
 
-            train_data_generator.init_iterator(sess)
-            train_model.train_epoch(sess, lr, summary_writer=writer)
             # saver.save(sess, '{}/yolov3_epoch_{}'.format(config.save_path, i))
 
             if i > 0 and i % 20 == 0:

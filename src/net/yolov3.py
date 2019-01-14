@@ -108,25 +108,43 @@ class YOLOv3(BaseModel):
         self.epoch_id = 0
 
     def _get_bbox_on_image_tensor(self):
-        pred_im = viz.tf_draw_bounding_box(
-            im = self.image * 255., 
-            bbox_list=self.layers['pred_bbox'], 
-            score_list=tf.reduce_max(self.layers['pred_score'], axis=-1), 
-            class_list=tf.argmax(self.layers['pred_score'], axis=-1), 
-            category_index=self._category_index,
-            max_boxes_to_draw=20, 
-            min_score_thresh=0.2)
+        with tf.name_scope('draw_prediction'):
+            pred_score = tf.reduce_max(self.layers['pred_score'], axis=-1)
+            pred_class = tf.argmax(self.layers['pred_score'], axis=-1)
+            pred_bbox = self.layers['pred_bbox']
 
-        true_im = viz.tf_draw_bounding_box(
-            im = self.image * 255., 
-            bbox_list=self.true_boxes, 
-            score_list=tf.cast(self.true_classes > 0, tf.int64),
-            class_list=self.true_classes * tf.cast(self.true_classes > 0, tf.float32), 
-            category_index=self._category_index,
-            max_boxes_to_draw=20, 
-            min_score_thresh=0.5)
+            query = tf.nn.top_k(pred_score, k=20, sorted=True).indices
+            bsize = tf.shape(pred_score)[0]
+            # Make tensor of indices for the first dimension
+            ii = tf.tile(tf.range(bsize)[:, tf.newaxis], (1, 20))
+            # Stack indices
+            idx = tf.stack([ii, query], axis=-1)
+            # Gather reordered tensor
+            sort_score = tf.gather_nd(pred_score, idx)
+            sort_class = tf.gather_nd(pred_class, idx)
+            sort_bbox = tf.gather_nd(pred_bbox, idx)
 
-        return pred_im, true_im
+            pred_im = viz.tf_draw_bounding_box(
+                im = self.image * 255., 
+                bbox_list=sort_bbox, 
+                score_list=sort_score, 
+                class_list=sort_class, 
+                category_index=self._category_index,
+                max_boxes_to_draw=20, 
+                min_score_thresh=0.2,
+                box_type='cxywh')
+
+            true_im = viz.tf_draw_bounding_box(
+                im = self.image * 255., 
+                bbox_list=self.true_boxes, 
+                score_list=tf.cast(self.true_classes > 0, tf.int64),
+                class_list=self.true_classes * tf.cast(self.true_classes > 0, tf.float32), 
+                category_index=self._category_index,
+                max_boxes_to_draw=20, 
+                min_score_thresh=0.5,
+                box_type='xyxy')
+
+            return pred_im, true_im
 
     def get_summary(self, name):
         with tf.name_scope(name):

@@ -86,7 +86,8 @@ class VOC(DetectionDataFlow):
         for file_path in self._file_name_list[0]:
             drive, path_and_file = os.path.splitdrive(file_path)
             path, file = os.path.split(path_and_file)
-            file_id = re.findall(r'\d+', file)[0]
+            file_id, file_extension = os.path.splitext(file)
+            # file_id = re.findall(r'\d+', file)[0]
 
             for idx, (data_name, data_dir) in enumerate(zip(data_name_list[1:], data_dir_list[1:])):
                 self._file_name_list[idx + 1].append(os.path.join(data_dir, file_id + data_name))

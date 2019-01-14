@@ -158,6 +158,19 @@ def yolo_prediction(inputs, anchors, n_class, scale, scale_id=1, name='yolo_pred
         return bbox_score, bbox_list, bbox_t_coord_list, objectness_list, classes_list
 
 def correct_yolo_boxes(xy_grid_flatten, bbox, anchor, scale):
+    """ compute predicted bbox from yolo t coordinates prediction for a specific anchor
+
+        Args:
+            xy_grid_flatten (tensor): batch flattend meshgrid of feature map with shape [bsize, h*w, 2]
+            bbox (tensor): predicted t coordinates bbox with shape [bsize, h, w, 4] or [bsize, h*w, 4]
+            anchor (list with length 2): width and height of the anchor
+            scale (int): stride of the feature map
+
+        Returns:
+            predicted bbox with shape [bsize, w, h, 4] and format [center_x, center_y, box_w, box_h] 
+            in original input image
+
+    """
     # [bsize, h, w, 4]
     bsize = tf.shape(bbox)[0]
     shape = tf.shape(bbox)
@@ -168,7 +181,7 @@ def correct_yolo_boxes(xy_grid_flatten, bbox, anchor, scale):
 
     pw, ph = anchor[0], anchor[1]
     bwh = tf.multiply(anchor, tf.exp(bbox_wh))
-
+    # bbox format [cx, cy, w, h]
     correct_bbox = tf.concat([bbox_xy * scale, bwh], axis=-1)
     return tf.reshape(correct_bbox, (bsize, shape[1], shape[2], 4))
 

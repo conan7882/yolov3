@@ -40,11 +40,8 @@ class PreProcess(object):
                 im = augment.change_color(im, hue, saturate, brightness, intensity_scale=im_intensity)
             if affine:
                 a_scale = np.random.uniform(low=0.9, high=1.1, size=2)
-                # scale_y = np.random.uniform(low=0.9, high=1.1, size=2)
                 a_trans = np.random.uniform(low=-0.3, high=0.3, size=2)
-                # t_y = np.random.uniform(low=-0.3, high=0.3)
                 a_shear = np.random.uniform(low=-0.2, high=0.2, size=2)
-                # s_y = np.random.uniform(low=-0.2, high=0.2)
                 angle = np.random.uniform(low=-15, high=15)
                 im, bbox = augment.affine_transform(
                     im, bbox, scale=a_scale, translation=a_trans, shear=a_shear, angle=angle)
@@ -133,8 +130,9 @@ class PreProcess(object):
                 im, bboxes = augment.rescale(im, bboxes, output_scale)
 
                 im_batch.append(im)
-                true_boxes[idx, :len(bboxes)] = bboxes
-                true_classes[idx, :len(class_labels)] = class_labels
+                n_sample = np.minimum(self._max_bbox, len(bboxes))
+                true_boxes[idx, :n_sample] = bboxes[:n_sample]
+                true_classes[idx, :n_sample] = class_labels[:n_sample]
                 
                 gt_mask = self._get_gt_mask(bboxes, class_labels, output_scale)
                 gt_mask_batch.append(gt_mask)

@@ -100,7 +100,7 @@ class ConfigParser(object):
                 cfg_dict['save_path'] = self._get_str(cfg_parser, section, 'save_path')
                 # cfg_parser[section]['save_path']
                 
-                cfg_dict['test_image_path'] = self._get_str(cfg_parser, section, 'test_image')
+                cfg_dict['test_image_path'] = self._get_str(cfg_parser, section, 'test_image_path')
                 # cfg_parser[section]['test_image']
                 cfg_dict['test_image_name'] = self._get_str(cfg_parser, section, 'test_image_name')
                 # cfg_parser[section]['test_image_name']

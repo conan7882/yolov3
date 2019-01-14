@@ -68,8 +68,8 @@ def load_VOC(rescale_shape_list,
     assert 0 < train_percentage <= 1.
 
     if platform.node() == 'arostitan':
-        im_dir = '/home/qge2/workspace/data/dataset/VOCdevkit/VOC2007/JPEGImages/'
-        xml_dir = '/home/qge2/workspace/data/dataset/VOCdevkit/VOC2007/Annotations/'
+        im_dir = '/home/qge2/workspace/data/dataset/VOCdevkit/VOC2012/JPEGImages/'
+        xml_dir = '/home/qge2/workspace/data/dataset/VOCdevkit/VOC2012/Annotations/'
     elif platform.node() == 'aros04':
         im_dir = 'E:/Dataset/VOCdevkit/VOC2007/JPEGImages/'
         xml_dir = 'E:/Dataset/VOCdevkit/VOC2007/Annotations/'

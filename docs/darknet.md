@@ -13,7 +13,7 @@
 
 
 ## Convert model
-- Download the pre-trained `weights` file of Darknet-53 from [here](https://pjreddie.com/darknet/imagenet/) (Section Pre-Trained Models, Darknet53 448x448 [link](https://pjreddie.com/media/files/darknet53_448.weights)).
+- Download the pre-trained `weights` file of Darknet-53 from [here](https://pjreddie.com/darknet/imagenet/) (Section 'Pre-Trained Models', Darknet53 448x448 [link](https://pjreddie.com/media/files/darknet53_448.weights)).
 - Go to `experiment/convert/`, run
 
   ```

@@ -53,10 +53,18 @@ def draw_bounding_box_on_image_array(im, bbox_list, class_list, score_list,
     plt.close()
 
 def tf_draw_bounding_box(im, bbox_list, score_list, class_list, category_index,
-                         max_boxes_to_draw=20, min_score_thresh=0.5):
+                         max_boxes_to_draw=20, min_score_thresh=0.5, box_type='xyxy'):
 
     im = tf.cast(im, tf.uint8)
     bbox_list = tf.cast(bbox_list, tf.float32)
+
+    if box_type == 'xyxy':
+        pass
+    elif box_type == 'cxywh':
+        bbox_list = tfbboxtool.cxywh2xyxy(bbox_list)
+    else:
+        raise ValueError('Incorrect box_type {}'.format(box_type))
+
     # viz_bbox = tfbboxtool.xyxy2yxyx(bbox_list)
     class_list = tf.cast(class_list, tf.int32)
 
