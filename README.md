@@ -1,7 +1,7 @@
 # YOLOv3 for Object Detection
 
 - TensorFlow implementation of [YOLOv3](https://arxiv.org/abs/1804.02767) for object detection.
-- Both inference and training pipelines implemented.
+- Both [inference](https://github.com/conan7882/YOLOv3/tree/master#use-pre-trained-model-for-object-detection-80-classes) and [training](https://github.com/conan7882/YOLOv3/tree/master#train-on-voc2012-dataset-20-classes) pipelines are implemented.
 - For inference using pre-trained model, the model stored in `.weights` file is first downloaded from official [YOLO website](https://pjreddie.com/darknet/yolo/) (Section 'Performance on the COCO Dataset', YOLOv3-416 [link](https://pjreddie.com/media/files/yolov3.weights)), then [converted](docs/convert.md) to `.npy` file and finally loaded by the TensorFlow model for prediction.
 - For training, the pre-trained DarkNet-53 is used as the feature extractor and the YOLO prediction layers at three scales are trained from scratch. Data augmentation such as random flipping, cropping, resize, affine transformation and color change (hue, saturation, brightness) are applied. Anchor clustering and multiple scale training (rescale training images every 10 epochs) are implemented as well.
 
