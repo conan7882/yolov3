@@ -31,7 +31,7 @@
 -->
 ## Use pre-trained model for object detection (80 classes)
 ### Download pre-trained model
-- Download the pre-trained model `yolov3.npy` from [here](https://www.dropbox.com/s/ovqhk1vahe3dd8z/yolov3.npy?dl=0). This model is converted from the `.weights` from [here](https://pjreddie.com/darknet/yolo/) (Section 'Performance on the COCO Dataset', YOLOv3-416 [link](https://pjreddie.com/media/files/yolov3.weights)).
+- Download the pre-trained model `yolov3.npy` from [here](https://www.dropbox.com/s/ovqhk1vahe3dd8z/yolov3.npy?dl=0). This model is converted from the `.weights` file from [here](https://pjreddie.com/darknet/yolo/) (Section 'Performance on the COCO Dataset', YOLOv3-416 [link](https://pjreddie.com/media/files/yolov3.weights)).
 - More details for converting models can be found [here](docs/convert.md).
 
 ### Setup configuration
@@ -75,7 +75,7 @@
 ## Train on [VOC2012](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/) dataset (20 classes)
 ### Prepare dataset and pre-trained feature extractor
 - Download VOC2012 training/validation data from [here](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar) (2GB tar file).
-- Download the pre-trained Darknet-53 `yolov3_feat.npy` from [here](https://www.dropbox.com/s/yr99vxxzrt832ro/yolov3_feat.npy?dl=0). This model is converted from the `.weights` from [here](https://pjreddie.com/darknet/imagenet/) (Section 'Pre-Trained Models', Darknet53 448x448 [link](https://pjreddie.com/media/files/darknet53_448.weights)).
+- Download the pre-trained Darknet-53 `yolov3_feat.npy` from [here](https://www.dropbox.com/s/yr99vxxzrt832ro/yolov3_feat.npy?dl=0). This model is converted from the `.weights` file from [here](https://pjreddie.com/darknet/imagenet/) (Section 'Pre-Trained Models', Darknet53 448x448 [link](https://pjreddie.com/media/files/darknet53_448.weights)).
 - More details for converting models can be found [here](docs/convert.md).
 
 ### Setup configuration
