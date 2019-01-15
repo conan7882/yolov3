@@ -12,19 +12,8 @@
 - An example of image classification using the pre-trained model is in [`experiment/darknet`](../experiment/darknet.py).
 
 
-## Convert model
-- Download the pre-trained `.weights` file of Darknet-53 from [here](https://pjreddie.com/darknet/imagenet/) (Section 'Pre-Trained Models', Darknet53 448x448 [link](https://pjreddie.com/media/files/darknet53_448.weights)).
-- Go to `experiment/convert/`, run
-
-  ```
-  python convert_model.py \
-  	--model darknet \
-  	--weights_dir WEIGHTS_DIR \
-  	--save_dir SAVE_DIR
-  ```
- 
-- `--weights_dir` is the directory to put the pre-trained `weights` file and `--save_dir` is the directory to put the converted `npy` file.
-- Converted parameters are saved as `darknet53_448.npy`.
+## Download pre-trained model
+- Download the pre-trained model `darknet53_448.npy` from [here](https://www.dropbox.com/s/6ksl8949ny3epc0/darknet53_448.npy?dl=0). This model is converted from the `.weights` file of Darknet-53 from [here](https://pjreddie.com/darknet/imagenet/) (Section 'Pre-Trained Models', Darknet53 448x448 [link](https://pjreddie.com/media/files/darknet53_448.weights)).
 - More details for converting models can be found [here](convert.md).
 
 ## ImageNet classification
